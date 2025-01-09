@@ -235,6 +235,46 @@
 
 </details>
 
+## 🔧 Setup & Configuration
+
+### Initial Setup
+1. 📱 Power on the device
+2. 🔄 Connect to `WCLOCK-WIFI-MANAGER` WiFi network
+3. 🌐 Navigate to the IP address shown on the display
+4. ⚙️ Enter your WiFi credentials
+5. 🎉 Device will restart and connect to your network
+
+### API Configuration
+- 🔑 OpenWeatherMap API key required
+- 🌍 Custom API support for personal weather station
+- 📍 Configurable location (latitude/longitude)
+
+### Debug Mode
+- 🐛 Enable via DEBUG_PIN (D6)
+- 📊 Shows network diagnostics
+- 🔍 Displays detailed error messages
+
+### Power Management
+- 🔋 Battery voltage monitoring
+- ⚡ Configurable sleep intervals (default: 15 mins)
+- 🌙 Night mode with reduced updates
+- 📉 Low battery failsafe mode
+
+### Display Modes
+1. Normal Mode
+   - Full weather data
+   - Temperature, humidity, pressure
+   - Moon phase and weather icons
+   - Sunrise/sunset times
+2. Limited Mode (Low Battery)
+   - Basic temperature display
+   - Battery status
+   - Time and date
+3. Night Mode
+   - Display sleeps when dark
+   - 5-minute wake intervals
+   - Power saving features
+
 ## 🌿 Environmental Impact
 
 <table>
