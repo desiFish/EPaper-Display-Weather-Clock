@@ -18,6 +18,7 @@
 #include <Arduino_JSON.h>
 #include <BH1750.h>
 #include <TimeLib.h>
+#include "icons.h"
 
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
@@ -521,13 +522,13 @@ void setup()
 
     Serial.println("Data Write Done");
     pref.end();
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    //esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
     // Go to sleep now
     Serial.println("Going to sleep now");
     Serial.flush();
     delay(100);
-    esp_deep_sleep_start();
+    //esp_deep_sleep_start();
   }
 }
 
@@ -618,7 +619,7 @@ void tempPrint(byte offset)
   }
   else
     u8g2Fonts.print("BATTERY CRITICAL, WIFI TURNED OFF");
-  iconBattery(percent);
+  iconBattery(display, percent);
 
   DateTime now = rtc.now();
 
@@ -821,7 +822,7 @@ void openWeatherPrint()
     time_t t = strtoll(JSON.stringify(myObject["current"]["sunrise"]).c_str(), nullptr, 10);
     setTime(t);
     adjustTime(19800);
-    iconSunRise(152, 170, true);
+    iconSunRise(display, 152, 170, true);
     u8g2Fonts.setCursor(166, 175); // start writing at this position
     u8g2Fonts.print("0");
     u8g2Fonts.print(hour());
@@ -831,7 +832,7 @@ void openWeatherPrint()
     t = strtoll(JSON.stringify(myObject["current"]["sunset"]).c_str(), nullptr, 10);
     setTime(t);
     adjustTime(19800);
-    iconSunRise(267, 170, false);
+    iconSunRise(display, 267, 170, false);
     u8g2Fonts.setCursor(281, 175);
     u8g2Fonts.print(hour());
     u8g2Fonts.print(":");
@@ -842,7 +843,7 @@ void openWeatherPrint()
     display.drawLine(320, 230, 400, 230, GxEPD_RED);
     display.drawLine(320, 231, 400, 231, GxEPD_RED);
 
-    iconMoonPhase(360, 260, 20, double(myObject["daily"][0]["moon_phase"]));
+    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"]));
     u8g2Fonts.setFont(u8g2_font_luRS08_tf);
     u8g2Fonts.setCursor(330, 297);
     u8g2Fonts.print("Moon Phase");
@@ -854,45 +855,45 @@ void openWeatherPrint()
 
     if (s == "01d")
     { // Clear Day
-      iconSun(361, 189, 15);
+      iconSun(display, 361, 189, 15);
       // iconSleet(x,y,r);//iconHail(x,y,r);//same
       // iconWind(x,y,r);
       // iconTornado(x,y,r);
     }
     else if (s == "01n") // Clear Night
-      iconMoon(361, 189, 15);
+      iconMoon(display, 361, 189, 15);
     else if (s == "02d") // few clouds
-      iconCloudyDay(330, 160, 60);
+      iconCloudyDay(display, 330, 160, 60);
     else if (s == "02n")
-      iconCloudyNight(330, 160, 60);
+      iconCloudyNight(display, 330, 160, 60);
     else if (s == "03d") // scattered clouds
-      iconCloud(361, 189, 15);
+      iconCloud(display, 361, 189, 15);
     else if (s == "03n")
-      iconCloud(361, 189, 15);
+      iconCloud(display, 361, 189, 15);
     else if (s == "04d") // broken clouds (two clouds)
-      iconCloudy(330, 160, 60);
+      iconCloudy(display, 330, 160, 60);
     else if (s == "04n")
-      iconCloudy(330, 160, 60);
+      iconCloudy(display, 330, 160, 60);
     else if (s == "09d") // shower rain
-      iconSleet(330, 160, 60);
+      iconSleet(display, 330, 160, 60);
     else if (s == "09n")
-      iconSleet(330, 160, 60);
+      iconSleet(display, 330, 160, 60);
     else if (s == "10d") // snow
-      iconRain(330, 160, 60);
+      iconRain(display, 330, 160, 60);
     else if (s == "10n")
-      iconRain(330, 160, 60);
+      iconRain(display, 330, 160, 60);
     else if (s == "11d") // thunderstorm
-      iconThunderstorm(330, 160, 60);
+      iconThunderstorm(display, 330, 160, 60);
     else if (s == "11n")
-      iconThunderstorm(330, 160, 60);
+      iconThunderstorm(display, 330, 160, 60);
     else if (s == "13d") // snow
-      iconSnow(330, 160, 60);
+      iconSnow(display, 330, 160, 60);
     else if (s == "13n")
-      iconSnow(330, 160, 60);
+      iconSnow(display, 330, 160, 60);
     else if (s == "50d") // mist
-      iconFog(330, 160, 60);
+      iconFog(display, 330, 160, 60);
     else if (s == "50n")
-      iconFog(330, 160, 60);
+      iconFog(display, 330, 160, 60);
 
     u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
     s = JSON.stringify(myObject["current"]["weather"][0]["main"]);
@@ -921,9 +922,10 @@ void openWeatherPrint()
   }
 }
 
-/*UNCOMMENT THIS IF YOU WISH TO USE ONLY oPENwEATHERmAP API
-COMMENT OR REMOVE THE OTHER FUNCTION WITH THE SAME NAME
-void openWeatherPrint() {
+// UNCOMMENT THIS IF YOU WISH TO USE ONLY oPENwEATHERmAP API
+// COMMENT OR REMOVE THE OTHER FUNCTION WITH THE SAME NAME
+void openWeatherPrint1()
+{
   String serverPath = "http://api.openweathermap.org/data/3.0/onecall?lat=" + lat + "&lon=" + lon + "&exclude=hourly,minutely&units=metric&appid=" + openWeatherMapApiKey;
 
   jsonBuffer = weatherDataAPI(serverPath.c_str());
@@ -933,52 +935,56 @@ void openWeatherPrint() {
   JSONVar myObject = JSON.parse(jsonBuffer);
 
   // JSON.typeof(jsonVar) can be used to get the type of the var
-  if (JSON.typeof(myObject) == "undefined") {
+  if (JSON.typeof(myObject) == "undefined")
+  {
     Serial.println("Parsing input failed!");
     ESP.restart();
     return;
   }
 
-  if (myObject["current"]["temp"] == null) {
+  if (myObject["current"]["temp"] == null)
+  {
     networkInfo();
-  } else {
+  }
+  else
+  {
     wifiStatus();
     u8g2Fonts.setFont(u8g2_font_helvB10_tf);
     u8g2Fonts.setCursor(29, 170);
     u8g2Fonts.print("OUTDOOR");
-    u8g2Fonts.setFont(u8g2_font_fub20_tf);  //u8g2_font_fub30_tf
+    u8g2Fonts.setFont(u8g2_font_fub20_tf); // u8g2_font_fub30_tf
     uint16_t width;
     width = u8g2Fonts.getUTF8Width(JSON.stringify(myObject["current"]["temp"]).c_str());
-    u8g2Fonts.setCursor(20, 200);  // start writing at this position
+    u8g2Fonts.setCursor(20, 200); // start writing at this position
     u8g2Fonts.print(myObject["current"]["temp"]);
     u8g2Fonts.setCursor(30 + width, 200);
     u8g2Fonts.print("C");
     u8g2Fonts.setFont(u8g2_font_fub11_tf);
-    u8g2Fonts.setCursor(22 + width, 185);  // start writing at this position
+    u8g2Fonts.setCursor(22 + width, 185); // start writing at this position
     u8g2Fonts.print("o");
 
-    u8g2Fonts.setFont(u8g2_font_fur11_tf);  //u8g2_font_fur14_tf
+    u8g2Fonts.setFont(u8g2_font_fur11_tf); // u8g2_font_fur14_tf
     width = u8g2Fonts.getUTF8Width(("Real Feel:" + JSON.stringify(myObject["current"]["feels_like"])).c_str());
-    u8g2Fonts.setCursor(5, 220);  // start writing at this position
+    u8g2Fonts.setCursor(5, 220); // start writing at this position
     u8g2Fonts.print("Real Feel:");
     u8g2Fonts.setCursor(75, 220);
     u8g2Fonts.print(myObject["current"]["feels_like"]);
     u8g2Fonts.setCursor(width + 16, 220);
     u8g2Fonts.print(String("C"));
-    u8g2Fonts.setFont(u8g2_font_baby_tf);  //u8g2_font_robot_de_niro_tf
-    u8g2Fonts.setCursor(13 + width, 211);  // start writing at this position
+    u8g2Fonts.setFont(u8g2_font_baby_tf); // u8g2_font_robot_de_niro_tf
+    u8g2Fonts.setCursor(13 + width, 211); // start writing at this position
     u8g2Fonts.print("o");
 
     u8g2Fonts.setFont(u8g2_font_fur14_tf);
-    u8g2Fonts.setCursor(5, 245);  // start writing at this position
+    u8g2Fonts.setCursor(5, 245); // start writing at this position
     u8g2Fonts.print(myObject["current"]["humidity"]);
     u8g2Fonts.print(String("%"));
 
-    u8g2Fonts.setCursor(5, 270);  // start writing at this position
+    u8g2Fonts.setCursor(5, 270); // start writing at this position
     u8g2Fonts.print(myObject["current"]["pressure"]);
     u8g2Fonts.print(String("hPa"));
     u8g2Fonts.setFont(u8g2_font_helvB10_tf);
-    u8g2Fonts.setCursor(5, 294);  // start writing at this position
+    u8g2Fonts.setCursor(5, 294); // start writing at this position
     u8g2Fonts.print("UVI: ");
     u8g2Fonts.print(myObject["current"]["uvi"]);
     u8g2Fonts.setFont(u8g2_font_fur11_tf);
@@ -994,12 +1000,12 @@ void openWeatherPrint() {
     display.drawLine(136, 155, 136, 299, GxEPD_RED);
     display.drawLine(137, 155, 137, 299, GxEPD_RED);
 
-    //Sunset sunrise print
+    // Sunset sunrise print
     time_t t = strtoll(JSON.stringify(myObject["current"]["sunrise"]).c_str(), nullptr, 10);
     setTime(t);
     adjustTime(19800);
-    iconSunRise(152, 170, true);
-    u8g2Fonts.setCursor(166, 175);  // start writing at this position
+    iconSunRise(display, 152, 170, true);
+    u8g2Fonts.setCursor(166, 175); // start writing at this position
     u8g2Fonts.print("0");
     u8g2Fonts.print(hour());
     u8g2Fonts.print(":");
@@ -1008,7 +1014,7 @@ void openWeatherPrint() {
     t = strtoll(JSON.stringify(myObject["current"]["sunset"]).c_str(), nullptr, 10);
     setTime(t);
     adjustTime(19800);
-    iconSunRise(267, 170, false);
+    iconSunRise(display, 267, 170, false);
     u8g2Fonts.setCursor(281, 175);
     u8g2Fonts.print(hour());
     u8g2Fonts.print(":");
@@ -1019,7 +1025,7 @@ void openWeatherPrint() {
     display.drawLine(320, 230, 400, 230, GxEPD_RED);
     display.drawLine(320, 231, 400, 231, GxEPD_RED);
 
-    iconMoonPhase(360, 260, 20, double(myObject["daily"][0]["moon_phase"]));
+    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"]));
     u8g2Fonts.setFont(u8g2_font_luRS08_tf);
     u8g2Fonts.setCursor(330, 297);
     u8g2Fonts.print("Moon Phase");
@@ -1029,47 +1035,49 @@ void openWeatherPrint() {
     s.remove(lastIndex);
     s.remove(0, 1);
 
-    if (s == "01d") {  //Clear Day
-      iconSun(361, 189, 15);
-      //iconSleet(x,y,r);//iconHail(x,y,r);//same
-      //iconWind(x,y,r);
-      //iconTornado(x,y,r);
-    } else if (s == "01n")  //Clear Night
-      iconMoon(361, 189, 15);
-    else if (s == "02d")  //few clouds
-      iconCloudyDay(330, 160, 60);
+    if (s == "01d")
+    { // Clear Day
+      iconSun(display, 361, 189, 15);
+      // iconSleet(x,y,r);//iconHail(x,y,r);//same
+      // iconWind(x,y,r);
+      // iconTornado(x,y,r);
+    }
+    else if (s == "01n") // Clear Night
+      iconMoon(display, 361, 189, 15);
+    else if (s == "02d") // few clouds
+      iconCloudyDay(display, 330, 160, 60);
     else if (s == "02n")
-      iconCloudyNight(330, 160, 60);
-    else if (s == "03d")  //scattered clouds
-      iconCloud(361, 189, 15);
+      iconCloudyNight(display, 330, 160, 60);
+    else if (s == "03d") // scattered clouds
+      iconCloud(display, 361, 189, 15);
     else if (s == "03n")
-      iconCloud(361, 189, 15);
-    else if (s == "04d")  //broken clouds (two clouds)
-      iconCloudy(330, 160, 60);
+      iconCloud(display, 361, 189, 15);
+    else if (s == "04d") // broken clouds (two clouds)
+      iconCloudy(display, 330, 160, 60);
     else if (s == "04n")
-      iconCloudy(330, 160, 60);
-    else if (s == "09d")  //shower rain
-      iconSleet(330, 160, 60);
+      iconCloudy(display, 330, 160, 60);
+    else if (s == "09d") // shower rain
+      iconSleet(display, 330, 160, 60);
     else if (s == "09n")
-      iconSleet(330, 160, 60);
-    else if (s == "10d")  //snow
-      iconRain(330, 160, 60);
+      iconSleet(display, 330, 160, 60);
+    else if (s == "10d") // snow
+      iconRain(display, 330, 160, 60);
     else if (s == "10n")
-      iconRain(330, 160, 60);
-    else if (s == "11d")  //thunderstorm
-      iconThunderstorm(330, 160, 60);
+      iconRain(display, 330, 160, 60);
+    else if (s == "11d") // thunderstorm
+      iconThunderstorm(display, 330, 160, 60);
     else if (s == "11n")
-      iconThunderstorm(330, 160, 60);
-    else if (s == "13d")  //snow
-      iconSnow(330, 160, 60);
+      iconThunderstorm(display, 330, 160, 60);
+    else if (s == "13d") // snow
+      iconSnow(display, 330, 160, 60);
     else if (s == "13n")
-      iconSnow(330, 160, 60);
-    else if (s == "50d")  //mist
-      iconFog(330, 160, 60);
+      iconSnow(display, 330, 160, 60);
+    else if (s == "50d") // mist
+      iconFog(display, 330, 160, 60);
     else if (s == "50n")
-      iconFog(330, 160, 60);
+      iconFog(display, 330, 160, 60);
 
-    u8g2Fonts.setFont(u8g2_font_luRS08_tf);  //u8g2_font_fur11_tf
+    u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
     s = JSON.stringify(myObject["current"]["weather"][0]["main"]);
     lastIndex = s.length() - 1;
     s.remove(lastIndex);
@@ -1077,572 +1085,22 @@ void openWeatherPrint() {
     u8g2Fonts.setCursor(330, 227);
     u8g2Fonts.print(s);
 
-    //u8g2Fonts.setCursor(186, 200);
+    // u8g2Fonts.setCursor(186, 200);
     s = JSON.stringify(myObject["alerts"][0]["event"]);
     lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);
-    if (s != "ul") {
+    if (s != "ul")
+    {
       int16_t tbx, tby;
       uint16_t tbw, tbh;
       display.getTextBounds("Alerts: " + s, 0, 0, &tbx, &tby, &tbw, &tbh);
       // center the bounding box by transposition of the origin:
       uint16_t x = ((display.width() - tbw) / 2) - tbx;
-      u8g2Fonts.setCursor(x, 25);  // start writing at this position
+      u8g2Fonts.setCursor(x, 25); // start writing at this position
       u8g2Fonts.print("Alerts: ");
       u8g2Fonts.print(s);
     }
-  }
-}
-*/
-
-// Separate the icons in future update to separate file
-void iconCloud(uint16_t x, uint16_t y, uint16_t r)
-{
-  // top circle
-  display.fillCircle(x, y, r, GxEPD_BLACK);
-  // left circle
-  display.fillCircle(x - r * 0.85, y + r * 0.8, r * 0.85, GxEPD_BLACK);
-  // right circle
-  display.fillCircle(x + r * 1.1, y + r * 0.8, r * 0.85, GxEPD_BLACK);
-  // rectangle
-  display.fillRect(x - r * 0.85, y + r * 0.8, (x + r * 1.1) - (x - r * 0.85), r * 0.9, GxEPD_BLACK);
-
-  // top circle
-  float offset = 0.8;
-  display.fillCircle(x, y, r * offset, GxEPD_WHITE);
-  // left circle
-  display.fillCircle(x - r * 0.85, y + r * 0.8, r * 0.85 * offset, GxEPD_WHITE);
-  // right circle
-  display.fillCircle(x + r * 1.1, y + r * 0.8, r * 0.85 * offset, GxEPD_WHITE);
-  // rectangle
-  display.fillRect(x - r * 0.85, y + r * 0.7, (x + r * 1.1) - (x - r * 0.85), r * offset, GxEPD_WHITE);
-}
-
-void iconSun(uint16_t x, uint16_t y, uint16_t r)
-{
-  display.drawLine(x - r * 1.75, y, x + r * 1.75, y, GxEPD_BLACK);
-  display.drawLine(x, y - r * 1.75, x, y + r * 1.75, GxEPD_BLACK);
-  display.drawLine(x - r * 1.25, y - r * 1.25, x + r * 1.25, y + r * 1.25, GxEPD_BLACK);
-  display.drawLine(x - r * 1.25, y + r * 1.25, x + r * 1.25, y - r * 1.25, GxEPD_BLACK);
-  display.fillCircle(x, y, r * 1.2, GxEPD_WHITE);
-  display.fillCircle(x, y, r, GxEPD_BLACK);
-  float offset = 0.9;
-  display.fillCircle(x, y, r * offset, GxEPD_RED);
-}
-
-void iconMoon(uint16_t x, uint16_t y, uint16_t r)
-{
-  float offset = 0.9;
-  display.fillCircle(x, y, r, GxEPD_BLACK);
-  display.fillCircle(x, y, r * offset, GxEPD_RED);
-  display.fillCircle(x + r, y - r, r, GxEPD_BLACK);
-  display.fillCircle(x + r, y - r, r * offset, GxEPD_WHITE);
-  display.fillRect(x, y - r * 2, r * 2.5, r, GxEPD_WHITE);
-  display.fillRect(x + r + 1, y - r, r * 1.5, r * 1.5, GxEPD_WHITE);
-}
-
-void iconClearDay(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconSun(x + s / 2, y + s / 2, s / 5);
-}
-
-void iconClearNight(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconMoon(x + s / 2, y + s / 2, s / 5);
-}
-
-void iconRain(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + s / 2.2, y + s / 2.5, s / 5);
-  display.fillRect(x + s * 0.275, y + s * 0.6, s / 2.5, s / 5, GxEPD_WHITE);
-
-  float offset = 0.8;
-  for (int i = 0; i <= s * 0.1; i++)
-  {
-    display.fillCircle(x + s * 0.4 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-    display.fillCircle(x + s * 0.6 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-  }
-  for (int i = 0; i <= s * 0.16; i++)
-  {
-    display.fillCircle(x + s * 0.5 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-  }
-}
-
-void iconSleet(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + s / 2.2, y + s / 2.5, s / 5);
-  display.fillRect(x + s * 0.275, y + s * 0.6, s / 2.5, s / 5, GxEPD_WHITE);
-
-  float offset = 0.8;
-  for (int i = 0; i <= s * 0.1; i++)
-  {
-    if (i < 1 || i > s * 0.1 * 0.5)
-    {
-      display.fillCircle(x + s * 0.4 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-      display.fillCircle(x + s * 0.6 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-    }
-  }
-  for (int i = 0; i <= s * 0.16; i++)
-  {
-    if (i < s * 0.16 * 0.5 || i > s * 0.16 * 0.8)
-      display.fillCircle(x + s * 0.5 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-  }
-}
-
-void iconSnow(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + s / 2.2, y + s / 2.5, s / 5);
-  display.fillRect(x + s * 0.275, y + s * 0.6, s / 2.5, s / 5, GxEPD_WHITE);
-
-  float offset = 0.8;
-  display.fillCircle(x + s / 2.75, y + s * 0.7, s * 0.02, GxEPD_BLACK);
-  display.fillCircle(x + s / 1.75, y + s * 0.7, s * 0.02, GxEPD_BLACK);
-
-  display.fillCircle(x + s / 2.75, y + s * 0.8, s * 0.02, GxEPD_BLACK);
-  display.fillCircle(x + s / 1.75, y + s * 0.8, s * 0.02, GxEPD_BLACK);
-
-  display.fillCircle(x + s / 2.15, y + s * 0.65, s * 0.02, GxEPD_BLACK);
-  display.fillCircle(x + s / 2.15, y + s * 0.75, s * 0.02, GxEPD_BLACK);
-  display.fillCircle(x + s / 2.15, y + s * 0.85, s * 0.02, GxEPD_BLACK);
-}
-
-void iconWind(uint16_t x, uint16_t y, uint16_t s)
-{
-  float offset = 0.8;
-  for (int i = 0; i <= s * 0.7; i++)
-  {
-    if (i < s * 0.6)
-      display.fillCircle(x + s * 0.15 + i, y + s * 0.4, s * 0.02, GxEPD_BLACK);
-    if (i < s * 0.5)
-      display.fillCircle(x + s * 0.1 + i, y + s * 0.5, s * 0.02, GxEPD_BLACK);
-    if (i < s * 0.2)
-      display.fillCircle(x + s * 0.7 + i, y + s * 0.5, s * 0.02, GxEPD_BLACK);
-    if (i < s * 0.6)
-      display.fillCircle(x + s * 0.2 + i, y + s * 0.6, s * 0.02, GxEPD_BLACK);
-  }
-}
-
-void iconFog(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + s / 2.2, y + s / 2.5, s / 5);
-  display.fillRect(x + s * 0.1, y + s * 0.55, s * 0.75, s / 5, GxEPD_WHITE);
-
-  float offset = 0.8;
-  for (int i = 0; i <= s * 0.7; i++)
-  {
-    display.fillCircle(x + s * 0.1 + i, y + s * 0.6, s * 0.02, GxEPD_BLACK);
-    display.fillCircle(x + s * 0.2 + i, y + s * 0.7, s * 0.02, GxEPD_BLACK);
-    display.fillCircle(x + s * 0.15 + i, y + s * 0.8, s * 0.02, GxEPD_BLACK);
-  }
-}
-
-void iconCloudy(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + (s / 4) * 3, y + s / 4, s / 10);
-  iconCloud(x + s / 2.1, y + s / 2.2, s / 5);
-}
-
-void iconCloudyDay(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconSun(x + (s / 3) * 2, y + s / 2.5, s / 6);
-  iconCloud(x + s / 2.2, y + s / 2.2, s / 5);
-}
-
-void iconCloudyNight(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconMoon(x + (s / 3) * 2, y + s / 3, s / 6);
-  iconCloud(x + s / 2.2, y + s / 2.2, s / 5);
-}
-
-void iconHail(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + s / 2.2, y + s / 2.5, s / 5);
-  display.fillRect(x + s * 0.275, y + s * 0.6, s / 2.5, s / 5, GxEPD_WHITE);
-
-  float offset = 0.8;
-  for (int i = 0; i <= s * 0.1; i++)
-  {
-    if (i < s * 0.1 * 0.5 || i == s * 0.1)
-    {
-      display.fillCircle(x + s * 0.4 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-      display.fillCircle(x + s * 0.6 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-    }
-  }
-  for (int i = 0; i <= s * 0.16; i++)
-  {
-    if (i < s * 0.16 * 0.7 || i == s * 0.16)
-      display.fillCircle(x + s * 0.5 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-  }
-}
-
-void iconThunderstorm(uint16_t x, uint16_t y, uint16_t s)
-{
-  iconCloud(x + s / 2.2, y + s / 2.5, s / 5);
-  display.fillRect(x + s * 0.275, y + s * 0.6, s / 2.5, s / 5, GxEPD_WHITE);
-
-  float offset = 0.8;
-  for (int i = 0; i <= s * 0.1; i++)
-  {
-    display.fillCircle(x + s * 0.6 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-  }
-  for (int i = 0; i <= s * 0.16; i++)
-  {
-    display.fillCircle(x + s * 0.5 - i * 0.5, y + s * 0.65 + i, s * 0.02, GxEPD_BLACK);
-  }
-  display.fillTriangle(x + s * 0.3, y + s * 0.75, x + s * 0.325, y + s * 0.65, x + s * 0.375, y + s * 0.65, GxEPD_RED);
-  display.fillTriangle(x + s * 0.3, y + s * 0.75, x + s * 0.4, y + s * 0.7, x + s * 0.33, y + s * 0.7, GxEPD_RED);
-  display.fillTriangle(x + s * 0.3, y + s * 0.85, x + s * 0.35, y + s * 0.7, x + s * 0.4, y + s * 0.7, GxEPD_RED);
-}
-
-void fillEllipsis(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c)
-{
-  for (int yi = -h; yi <= h; yi++)
-  {
-    for (int xi = -w; xi <= w; xi++)
-    {
-      if (xi * xi * h * h + yi * yi * w * w <= h * h * w * w)
-        display.writePixel(x + xi, y + yi, c);
-    }
-  }
-}
-
-void iconTornado(uint16_t x, uint16_t y, uint16_t s)
-{
-  // 1
-  fillEllipsis(x + s * 0.33, y + s * 0.7, s / 12 * 1.2, s / 18 * 1.2, GxEPD_BLACK);
-  fillEllipsis(x + s * 0.33, y + s * 0.7, s / 12, s / 18, GxEPD_WHITE);
-  // 2
-  fillEllipsis(x + s * 0.32, y + s * 0.65, s / 9 * 1.2, s / 16 * 1.2, GxEPD_BLACK);
-  fillEllipsis(x + s * 0.32, y + s * 0.65, s / 9, s / 16, GxEPD_WHITE);
-  // 3
-  fillEllipsis(x + s * 0.35, y + s * 0.55, s / 7 * 1.2, s / 12 * 1.2, GxEPD_BLACK);
-  fillEllipsis(x + s * 0.35, y + s * 0.55, s / 7, s / 12, GxEPD_WHITE);
-  // 4
-  fillEllipsis(x + s * 0.425, y + s * 0.425, s / 5 * 1.2, s / 8 * 1.2, GxEPD_BLACK);
-  fillEllipsis(x + s * 0.425, y + s * 0.425, s / 5, s / 8, GxEPD_WHITE);
-  // 5
-  fillEllipsis(x + s * 0.5, y + s * 0.3, s / 4 * 1.2, s / 7 * 1.2, GxEPD_BLACK);
-  fillEllipsis(x + s * 0.5, y + s * 0.3, s / 4, s / 7, GxEPD_WHITE);
-}
-
-// Takes x,y coordinates and radius r and phase. Phase denotes Moons current shape
-void iconMoonPhase(uint16_t x, uint16_t y, uint16_t r, float phase)
-{
-  display.fillCircle(x, y, r, GxEPD_WHITE);
-  display.drawCircle(x, y, r, GxEPD_BLACK);
-  if (phase == 0)
-    display.fillCircle(x, y, r, GxEPD_BLACK); // New Moon
-  else if (phase > 0 && phase < 0.5)
-  {
-    for (int i = 0; i < r + 1; i++)
-    {
-      float cx = sqrt((r * r) - (i * i));
-      float c2 = cx * 2 * (1 - (phase * 2));
-      display.drawLine(x - cx, y + i, x - cx + c2, y + i, GxEPD_BLACK);
-      display.drawLine(x - cx, y - i, x - cx + c2, y - i, GxEPD_BLACK);
-    }
-  }
-  else if (phase == 0.5)
-    ; // display.fillCircle(x, y, r, GxEPD_RED);  //Full Moon
-  else
-  {
-    display.fillCircle(x, y, r, GxEPD_BLACK);
-    for (int i = 0; i < r + 1; i++)
-    {
-      float cx = sqrt((r * r) - (i * i));
-      float c2 = cx * 2 * ((1 - phase) * 2);
-      display.drawLine(x - cx, y + i, x - cx + c2, y + i, GxEPD_WHITE);
-      display.drawLine(x - cx, y - i, x - cx + c2, y - i, GxEPD_WHITE);
-    }
-    display.drawCircle(x, y, r, GxEPD_BLACK);
-  }
-
-  // Add moon surface on top
-  display.drawPixel(x - r + 22, y - r + 1, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 3, GxEPD_BLACK);
-  display.drawPixel(x - r + 24, y - r + 3, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 4, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 4, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 4, GxEPD_BLACK);
-  display.drawPixel(x - r + 24, y - r + 4, GxEPD_BLACK);
-  display.drawPixel(x - r + 26, y - r + 4, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 5, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 5, GxEPD_BLACK);
-  display.drawPixel(x - r + 26, y - r + 5, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 6, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 6, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 6, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 23, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 25, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 28, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 30, y - r + 7, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 20, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 21, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 23, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 26, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 28, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 29, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 31, y - r + 8, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 20, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 22, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 23, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 25, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 26, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 28, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 29, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 30, y - r + 9, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 20, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 23, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 24, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 26, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 29, y - r + 10, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 21, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 24, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 28, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 30, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 31, y - r + 11, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 21, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 23, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 24, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 25, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 32, y - r + 12, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 22, y - r + 13, GxEPD_BLACK);
-  display.drawPixel(x - r + 1, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 25, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 28, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 31, y - r + 14, GxEPD_BLACK);
-  display.drawPixel(x - r + 1, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 2, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 29, y - r + 15, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 16, GxEPD_BLACK);
-  display.drawPixel(x - r + 1, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 2, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 4, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 17, GxEPD_BLACK);
-  display.drawPixel(x - r + 1, y - r + 18, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 18, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 18, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 18, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 18, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 18, GxEPD_BLACK);
-  display.drawPixel(x - r + 2, y - r + 19, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 19, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 19, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 19, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 19, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 19, GxEPD_BLACK);
-  display.drawPixel(x - r + 1, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 2, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 20, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 21, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 21, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 21, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 21, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 21, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 21, GxEPD_BLACK);
-  display.drawPixel(x - r + 2, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 20, y - r + 22, GxEPD_BLACK);
-  display.drawPixel(x - r + 2, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 4, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 23, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 4, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 24, GxEPD_BLACK);
-  display.drawPixel(x - r + 3, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 5, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 20, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 21, y - r + 25, GxEPD_BLACK);
-  display.drawPixel(x - r + 4, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 12, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 13, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 26, GxEPD_BLACK);
-  display.drawPixel(x - r + 6, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 20, y - r + 27, GxEPD_BLACK);
-  display.drawPixel(x - r + 7, y - r + 28, GxEPD_BLACK);
-  display.drawPixel(x - r + 8, y - r + 28, GxEPD_BLACK);
-  display.drawPixel(x - r + 10, y - r + 28, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 28, GxEPD_BLACK);
-  display.drawPixel(x - r + 18, y - r + 28, GxEPD_BLACK);
-  display.drawPixel(x - r + 9, y - r + 29, GxEPD_BLACK);
-  display.drawPixel(x - r + 11, y - r + 29, GxEPD_BLACK);
-  display.drawPixel(x - r + 14, y - r + 29, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 29, GxEPD_BLACK);
-  display.drawPixel(x - r + 16, y - r + 29, GxEPD_BLACK);
-  display.drawPixel(x - r + 15, y - r + 30, GxEPD_BLACK);
-  display.drawPixel(x - r + 19, y - r + 30, GxEPD_BLACK);
-  display.drawPixel(x - r + 17, y - r + 31, GxEPD_BLACK);
-}
-
-// direction=true (UP), direction=false (DOWN)
-void iconSunRise(uint16_t x, uint16_t y, bool direction)
-{
-  uint16_t r = 7;
-
-  // Horizontal
-  display.drawLine(x - r * 2 + 2, y, x + r * 2 - 2, y, GxEPD_BLACK);
-  // Vertical
-  display.drawLine(x, y - r * 2 + 2, x, y, GxEPD_BLACK);
-  // Angle Top right
-  display.drawLine(x - r * 2 + 5, y - r * 2 + 5, x, y, GxEPD_BLACK);
-  // Angle Top left
-  display.drawLine(x, y, x + r * 2 - 5, y - r * 2 + 5, GxEPD_BLACK);
-  // Remove lines inside
-  display.fillCircle(x, y, r + 1, GxEPD_WHITE);
-  // Empty inside
-  display.fillCircle(x, y, r - 1, GxEPD_RED);
-  display.drawCircle(x, y, r - 1, GxEPD_BLACK);
-  // Overwrite the bottom
-  display.fillRect(x - r, y + 4, r * 2, r, GxEPD_WHITE);
-
-  // Arrow up
-  if (direction == true)
-  {
-    display.fillTriangle(x - r / 2 - 1, y + r - 2, x, y + r - 7, x + r / 2 + 1, y + r - 2, GxEPD_WHITE);
-    display.drawLine(x - r / 2, y + r - 2, x, y + r - 6, GxEPD_BLACK);
-    display.drawLine(x, y + r - 6, x + r / 2, y + r - 2, GxEPD_BLACK);
-  }
-  // Arrow DOWN
-  if (direction == false)
-  {
-    display.drawLine(x - r / 2, y + r - 2, x, y + r + 2, GxEPD_BLACK);
-    display.drawLine(x, y + r + 2, x + r / 2, y + r - 2, GxEPD_BLACK);
-  }
-  // Horizon line
-  display.drawLine(x - r, y + r - 2, x - r / 2, y + r - 2, GxEPD_BLACK);
-  display.drawLine(x + r / 2, y + r - 2, x + r, y + r - 2, GxEPD_BLACK);
-}
-
-// takes battery percent (integer) as input and prints battery icon
-void iconBattery(byte percent)
-{
-  display.drawRect(8, 4, 12, 7, GxEPD_BLACK);
-  display.drawRect(6, 5, 2, 5, GxEPD_BLACK);
-
-  if (percent >= 95) // Full
-    display.fillRect(9, 4, 10, 6, GxEPD_BLACK);
-  else if (percent >= 85 && percent < 95) // ful-Med
-    display.fillRect(10, 4, 9, 6, GxEPD_BLACK);
-  else if (percent > 65 && percent < 85) // Med
-    display.fillRect(11, 4, 9, 6, GxEPD_BLACK);
-  else if (percent > 40 && percent <= 65) // half
-    display.fillRect(13, 4, 7, 6, GxEPD_BLACK);
-  else if (percent > 20 && percent <= 40) // low
-    display.fillRect(15, 4, 5, 6, GxEPD_BLACK);
-  else if (percent > 8 && percent <= 20) // critical-low
-    display.fillRect(16, 5, 3, 5, GxEPD_RED);
-  else
-  { // near empty
-    display.drawRect(8, 4, 12, 7, GxEPD_RED);
-    display.drawRect(6, 5, 2, 5, GxEPD_RED);
   }
 }
 
