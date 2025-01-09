@@ -66,17 +66,35 @@ High/Low Tracking | Real-time Updates | Smart Power Management | Auto Configurat
 
 ## 📊 Battery Performance
 
-```mermaid
-gantt
-    title Battery Life Cycles
-    dateFormat  DD-MM-YYYY
-    section First Cycle
-    73 Days     :06-05-2024, 17-07-2024
-    section Second Cycle
-    49 Days     :milestone
-    section Third Cycle
-    48 Days     :milestone
-```
+<table>
+  <tr>
+    <th>Cycle</th>
+    <th>Duration</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>First Cycle</td>
+    <td>73 Days</td>
+    <td>06/05/2024 - 17/07/2024 (2 months 12 days)</td>
+  </tr>
+  <tr>
+    <td>Second Cycle</td>
+    <td>49 Days</td>
+    <td>~7 weeks</td>
+  </tr>
+  <tr>
+    <td>Third Cycle</td>
+    <td>48 Days</td>
+    <td>~7 weeks</td>
+  </tr>
+</table>
+
+<div align="center">
+  <h4>📉 Battery Life Trend</h4>
+  First: ████████████████████ 73 days<br>
+  Second: █████████████ 49 days<br>
+  Third: █████████████ 48 days
+</div>
 
 ## 📸 Gallery
 
