@@ -27,10 +27,10 @@
 
 | 🔧 Setup & Build | 📊 Features & Specs | 🌱 Environmental | 🤝 Community |
 |:---------------:|:------------------:|:----------------:|:------------:|
-| [Hardware Components](#🛠️-hardware-components) | [Key Features](#📱-key-features--updates) | [Eco-Friendly Features](#🌱-eco-friendly-features) | [Contributing](#🤝-contributing) |
-| [Initial Setup](#🔧-setup--configuration) | [Core Features](#⭐-core-features) | [Environmental Impact](#🌿-environmental-impact) | [License](#📝-license--credits) |
-| [API Configuration](#api-configuration) | [Technical Specs](#💫-technical-specifications) | [Battery Performance](#📊-battery-performance) | [Credits](#👏-credits) |
-| [Debug Mode](#debug-mode) | [Display Modes](#display-modes) | [Gallery](#📸-gallery) | [Star Project](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/stargazers) |
+| [Hardware Components](#hardware-components) | [Key Features](#key-features--updates) | [Eco-Friendly Features](#eco-friendly-features) | [Contributing](#contributing) |
+| [Initial Setup](#setup--configuration) | [Core Features](#core-features) | [Environmental Impact](#environmental-impact) | [License](#license--credits) |
+| [API Configuration](#api-configuration) | [Technical Specs](#technical-specifications) | [Battery Performance](#battery-performance) | [Credits](#-credits) |
+| [Debug Mode](#debug-mode) | [Display Modes](#display-modes) | [Gallery](#gallery) | [Star Project](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/stargazers) |
 
 </div>
 
