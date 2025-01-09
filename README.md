@@ -11,7 +11,9 @@
 7. ICR (LiCoO2) 2x2200mAh Lithium Battery (Simple 18650 batteries)
 8. 2xBMS (3.7V) CuttOff at 2.5V or Higher
 9. Other stuffs like wire, capacitor (104), resistor (1M Ohm), connectors, switch, LED (1) etc.
-    
+
+## UPDATES V0.1.2-alpha
+[Changelog](https://github.com/KamadoTanjiro-beep/ESP32-ePaper-Display-Weather-Clock/commit/05175a90e57118196dd1360790bf2677fd99840c)
 ## FEATURES & UPDATES V0.1.1-alpha
 [Changelog](https://github.com/KamadoTanjiro-beep/ESP32-ePaper-Display-Weather-Clock/commit/5dc709a0e5b343795bc190758548002f35fe8f6f)
 ## FEATURES V0.1.0-alpha
@@ -38,14 +40,15 @@ Also, it houses a LUX sensor (BH1750) for sleeping while it is dark (E-paper doe
 
 Made of old delivery card boards. :exploding_head: One-Punch Eco-Friendly Boost Ultra Pro Max :leaves: to :infinity:
 
-Supports 5V 500mA Charging (In-built from ESP32C3 Module)
+Supports 5V 1000mA Charging (TP5000 Module)
 
 USB-C based operation.
 
 This clock runs on GxEPD2 Library and others. Weather icon credits: SeBassTian23
 
 Battery life: <br>
-a. Full: 06/05/2024, Dead: To be updated
+a. Then: Full: 06/05/2024, Dead: 17/07/2024 So, 73 days or 2 month 12 Days.
+b. 2nd Charge: 49 Days, 3rd Charge: 48 Days
 
 ## Picture(s)
 
