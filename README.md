@@ -21,22 +21,7 @@
 
 ---
 
-## 📑 Table of Contents
-
-<div align="center">
-
-| 🔧 Setup & Build | 📊 Features & Specs | 🌱 Environmental | 🤝 Community |
-|:---------------:|:------------------:|:----------------:|:------------:|
-| [Hardware Components](#hardware-components) | [Key Features](#key-features--updates) | [Eco-Friendly Features](#eco-friendly-features) | [Contributing](#contributing) |
-| [Setup & Configuration](#setup--configuration) | [Core Features](#core-features) | [Environmental Impact](#environmental-impact) | [License & Credits](#license--credits) |
-| [API Configuration](#api-configuration) | [Technical Specs](#technical-specifications) | [Battery Performance](#battery-performance) | [Gallery](#gallery) |
-| [Debug Mode](#debug-mode) | [Display Modes](#display-modes) | [Credits](#credits) | [Star Project](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/stargazers) |
-
-</div>
-
----
-
-## 🛠️ Hardware Components {#hardware}
+## 🛠️ Hardware Components
 
 <table>
   <tr>
@@ -69,7 +54,7 @@
   </tr>
 </table>
 
-## 📱 Key Features & Updates {#features}
+## 📱 Key Features & Updates
 
 <table>
 <tr>
@@ -94,7 +79,7 @@
 </tr>
 </table>
 
-## ⭐ Core Features {#core}
+## ⭐ Core Features
 
 <div align="center">
 
@@ -111,7 +96,7 @@
 • ⏰ Power-efficient Sleep Modes  
 • 📊 Environmental Monitoring
 
-## 📊 Battery Performance {#battery}
+## 📊 Battery Performance
 
 <table>
   <tr>
@@ -143,7 +128,7 @@
   Third: █████████████ 48 days
 </div>
 
-## 📸 Gallery {#gallery}
+## 📸 Gallery
 
 <table style="border-spacing: 10px; border-collapse: separate;">
   <tr>
@@ -158,7 +143,7 @@
   </tr>
 </table>
 
-## 🌱 Eco-Friendly Features {#eco-friendly}
+## 🌱 Eco-Friendly Features
 
 - 📱 E-Paper Display (no backlight needed)
 - 🔋 LiFePO4 Batteries (Lithium Iron Phosphate)
@@ -169,7 +154,7 @@
 - 📦 Recycled cardboard construction
 - 💡 Smart light sensor for power saving
 
-## 💫 Technical Specifications {#specs}
+## 💫 Technical Specifications
 
 <details>
 <summary>🧠 Core System</summary>
@@ -250,7 +235,7 @@
 
 </details>
 
-## 🔧 Setup & Configuration {#setup}
+## 🔧 Setup & Configuration
 
 ### Initial Setup
 1. 📱 Power on the device
@@ -259,12 +244,12 @@
 4. ⚙️ Enter your WiFi credentials
 5. 🎉 Device will restart and connect to your network
 
-### API Configuration {#api}
+### API Configuration
 - 🔑 OpenWeatherMap API key required
 - 🌍 Custom API support for personal weather station
 - 📍 Configurable location (latitude/longitude)
 
-### Debug Mode {#debug}
+### Debug Mode
 - 🐛 Enable via DEBUG_PIN (D6)
 - 📊 Shows network diagnostics
 - 🔍 Displays detailed error messages
@@ -275,7 +260,7 @@
 - 🌙 Night mode with reduced updates
 - 📉 Low battery failsafe mode
 
-### Display Modes {#display}
+### Display Modes
 1. Normal Mode
    - Full weather data
    - Temperature, humidity, pressure
@@ -290,7 +275,7 @@
    - 5-minute wake intervals
    - Power saving features
 
-## 🌿 Environmental Impact {#environmental}
+## 🌿 Environmental Impact
 
 <table>
 <tr>
@@ -315,7 +300,7 @@
 </tr>
 </table>
 
-## 🤝 Contributing {#contributing}
+## 🤝 Contributing
 
 <div align="center">
 
@@ -324,7 +309,7 @@
 
 </div>
 
-## 📝 License & Credits {#license}
+## 📝 License & Credits
 
 <table>
 <tr>
@@ -342,7 +327,7 @@ GNU General Public License v3.0
 </td>
 <td>
 
-### 👏 Credits {#credits}
+### 👏 Credits
 - 🎨 Weather icons by SeBassTian23
 - 📚 GxEPD2 Library
 - 💻 Community Contributors
