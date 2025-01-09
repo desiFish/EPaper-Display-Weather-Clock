@@ -17,7 +17,7 @@
 4. BH1750 (For light sensing)
 5. DS3231 (For time keeping)
 6. BMP680 (For humidity & pressure)
-7. LFP 2x4000mAh Lithium Iron Phosphate Battery (IFR26700) these are cheaper, safer and more capacity
+7. LFP 2x4000mAh (Total 8000mAh) Lithium Iron Phosphate Battery (IFR26700) these are cheaper, safer and more capacity
 > Older: 7. ICR (LiCoO2) 2x2200mAh Lithium Battery (Simple 18650 batteries)
 8. 2xBMS (3.7V) CuttOff at 2.5V or Higher
 9. Other stuffs like wire, capacitor (104), resistor (1M Ohm), connectors, switch, LED (1) etc.
@@ -64,7 +64,12 @@ b. 2nd Charge: 49 Days, 3rd Charge: 48 Days
 
 ## Picture(s)
 
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/epd.jpg)
+![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd.jpg)
+![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd2.jpg)
+![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd3.jpg)
+![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd4.jpg)
+![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd5.jpg)
+![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd6.jpg)
 
 
 ## License
