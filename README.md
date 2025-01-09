@@ -1,17 +1,29 @@
 
 # Minimalistic E-Paper 4.2inch Display Weather Station
 
+<div align="center">
+
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
+[![License](https://img.shields.io/github/license/desiFish/ESP32-ePaper-Display-Weather-Clock)](/LICENSE)
+[![GitHub Issues](https://img.shields.io/github/issues/desiFish/ESP32-ePaper-Display-Weather-Clock.svg)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/issues)
+[![Release](https://img.shields.io/github/v/release/desiFish/ESP32-ePaper-Display-Weather-Clock)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases)
+
+</div>
+
 ## Hardware
-1. Xiao ESP32 C3
+1. Tested on Xiao ESP32 C3 and Xiao ESP32 C6
 2. Waveshare 4.2inch TriColor 400x300 E-paper display refresh time 15 secs.
 3. TMP117 (For temperature)
 4. BH1750 (For light sensing)
 5. DS3231 (For time keeping)
 6. BMP680 (For humidity & pressure)
-7. ICR (LiCoO2) 2x2200mAh Lithium Battery (Simple 18650 batteries)
+7. LFP 2x4000mAh Lithium Iron Phosphate Battery (IFR26700) these are cheaper, safer and more capacity
+> Older: 7. ICR (LiCoO2) 2x2200mAh Lithium Battery (Simple 18650 batteries)
 8. 2xBMS (3.7V) CuttOff at 2.5V or Higher
 9. Other stuffs like wire, capacitor (104), resistor (1M Ohm), connectors, switch, LED (1) etc.
 
+## UPDATES V0.1.3-alpha
+[Changelog](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.1.3-alpha)
 ## UPDATES V0.1.2-alpha
 [Changelog](https://github.com/KamadoTanjiro-beep/ESP32-ePaper-Display-Weather-Clock/commit/05175a90e57118196dd1360790bf2677fd99840c)
 ## FEATURES & UPDATES V0.1.1-alpha

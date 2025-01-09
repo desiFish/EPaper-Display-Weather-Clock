@@ -489,7 +489,7 @@ void setup()
         {
           Serial.println("Time And Weather");
           tempPrint();
-          openWeatherPrint();
+          weatherPrint();
           Serial.println("Time And Weather Done");
         }
         else
@@ -522,13 +522,13 @@ void setup()
 
     Serial.println("Data Write Done");
     pref.end();
-    //esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
     // Go to sleep now
     Serial.println("Going to sleep now");
     Serial.flush();
     delay(100);
-    //esp_deep_sleep_start();
+    esp_deep_sleep_start();
   }
 }
 
@@ -717,7 +717,7 @@ void tempPrint(byte offset)
 
 // works only if wifi is connected. Prints data from openweather api and custom weather station.
 // Use the other function with same name (COMMENTED) if you wish to use only OpenWeatherMap
-void openWeatherPrint()
+void weatherPrint()
 {
   String serverPath = "http://api.openweathermap.org/data/3.0/onecall?lat=" + lat + "&lon=" + lon + "&exclude=hourly,minutely&units=metric&appid=" + openWeatherMapApiKey;
 
@@ -922,9 +922,11 @@ void openWeatherPrint()
   }
 }
 
-// UNCOMMENT THIS IF YOU WISH TO USE ONLY oPENwEATHERmAP API
+// UNCOMMENT BELOW FUNCTION IF YOU WISH TO USE ONLY oPENwEATHERmAP API
 // COMMENT OR REMOVE THE OTHER FUNCTION WITH THE SAME NAME
-void openWeatherPrint1()
+
+/*
+void weatherPrint()
 {
   String serverPath = "http://api.openweathermap.org/data/3.0/onecall?lat=" + lat + "&lon=" + lon + "&exclude=hourly,minutely&units=metric&appid=" + openWeatherMapApiKey;
 
@@ -1102,7 +1104,7 @@ void openWeatherPrint1()
       u8g2Fonts.print(s);
     }
   }
-}
+}*/
 
 // In case of api failure, it displays network info for debugging
 void networkInfo()
