@@ -138,6 +138,21 @@
     <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd5.jpg" alt="Clock" width="300"/></td>
     <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd6.jpg" alt="Clock" width="300"/></td>
   </tr>
+  <tr>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd7.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd8.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd9.jpg" alt="Clock" width="300"/></td>
+  </tr>
+  <tr>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd10.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd11.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd12.jpg" alt="Clock" width="300"/></td>
+  </tr>
+  <tr>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd13.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd14.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd15.jpg" alt="Clock" width="300"/></td>
+  </tr>
 </table>
 
 ## 🌱 Eco-Friendly Features
