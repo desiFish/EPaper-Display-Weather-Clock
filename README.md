@@ -1,4 +1,3 @@
-
 # Minimalistic E-Paper 4.2inch Display Weather Station
 
 <div align="center">
@@ -64,13 +63,18 @@ b. 2nd Charge: 49 Days, 3rd Charge: 48 Days
 
 ## Picture(s)
 
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd.jpg)
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd2.jpg)
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd3.jpg)
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd4.jpg)
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd5.jpg)
-![Clock](https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd6.jpg)
-
+<table style="border-spacing: 10px; border-collapse: separate;">
+  <tr>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd2.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd3.jpg" alt="Clock" width="300"/></td>
+  </tr>
+  <tr>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd4.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd5.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd6.jpg" alt="Clock" width="300"/></td>
+  </tr>
+</table>
 
 ## License
 
