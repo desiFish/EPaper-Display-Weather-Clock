@@ -176,7 +176,7 @@
   - 32-bit RISC-V single-core CPU up to 160MHz
   - 320KB SRAM, 4MB Flash
   - WiFi 6 & Bluetooth 5.0
-  - Ultra-low power consumption: 10µA in deep sleep
+  - Ultra-low power consumption: 14µA in deep sleep
   - 11 Digital/Analog pins
   - USB-C interface
 
