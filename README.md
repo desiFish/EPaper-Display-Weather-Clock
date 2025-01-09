@@ -61,10 +61,8 @@
 <td width="50%" align="center">
   
 ### 🆕 Latest Version
-[**v0.1.3-alpha**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.1.3-alpha)
-- 🚀 Performance improvements
-- 🔧 Bug fixes
-- ✨ New features
+[**v0.2.0-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.0-beta)
+- 🚀 Power Efficiency improvements 
   
 </td>
 <td width="50%" align="center">
@@ -72,7 +70,6 @@
 ### 🎯 Coming Soon
 - 📱 Web browser integration
 - 🌐 Enhanced weather data
-- ⚡ Power optimizations
 - 🎨 New display layouts
   
 </td>
