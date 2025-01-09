@@ -8,8 +8,14 @@
 [![Release](https://img.shields.io/github/v/release/desiFish/ESP32-ePaper-Display-Weather-Clock)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases)
 
 <p align="center">
-  <i>A beautiful, eco-friendly weather station powered by E-Paper display!</i>
+  <i>🌈 A beautiful, eco-friendly weather station powered by E-Paper display! 🌱</i>
 </p>
+
+</div>
+
+<div align="center">
+
+### 🌟 Smart • Efficient • Eco-Friendly 🌟
 
 </div>
 
@@ -18,6 +24,13 @@
 ## 🛠️ Hardware Components
 
 <table>
+  <tr>
+    <td>🎯 <b>Tested On</b></td>
+    <td>
+      • Seeed Studio XIAO ESP32 C3<br>
+      • Seeed Studio XIAO ESP32 C6
+    </td>
+  </tr>
   <tr>
     <td>📟 <b>Display</b></td>
     <td>Waveshare 4.2inch TriColor 400x300 E-paper (15s refresh)</td>
@@ -37,32 +50,51 @@
   </tr>
   <tr>
     <td>🔌 <b>Other</b></td>
-    <td>2xBMS (3.7V), capacitors, resistors, connectors, etc.</td>
+    <td>2xBMS, capacitors, resistors, connectors, etc.</td>
   </tr>
 </table>
 
-## 🆕 Latest Updates
+## 📱 Key Features & Updates
 
-### V0.1.3-alpha
-[📝 View Changelog](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.1.3-alpha)
+<table>
+<tr>
+<td width="50%" align="center">
+  
+### 🆕 Latest Version
+[**v0.1.3-alpha**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.1.3-alpha)
+- 🚀 Performance improvements
+- 🔧 Bug fixes
+- ✨ New features
+  
+</td>
+<td width="50%" align="center">
 
-### V0.1.2-alpha
-[📝 View Changelog](https://github.com/KamadoTanjiro-beep/ESP32-ePaper-Display-Weather-Clock/commit/05175a90e57118196dd1360790bf2677fd99840c)
+### 🎯 Coming Soon
+- 📱 Web browser integration
+- 🌐 Enhanced weather data
+- ⚡ Power optimizations
+- 🎨 New display layouts
+  
+</td>
+</tr>
+</table>
 
-## ✨ Features
+## ⭐ Core Features
 
 <div align="center">
 
-🌡️ Medical-grade Temperature | 💧 Humidity & Pressure | 🔋 Battery Monitoring | 🌍 Weather Data
+🌡️ Medical-grade Temperature | 💧 Humidity & Pressure | 🔋 Smart Battery | 🌍 Weather Data
 :-------------------------:|:-------------------------:|:-------------------------:|:-------------------------:
-TMP117 Sensor | BME680 Sensor | Voltage & Percentage | OpenWeatherMap API
-High/Low Tracking | Real-time Updates | Smart Power Management | Auto Configuration
+±0.1°C Precision | Real-time Monitoring | Intelligent Power Mgmt | Global Forecasting
+`TMP117 Sensor` | `BME680 Sensor` | `2000+ Cycles` | `OpenWeatherMap`
 
 </div>
 
-• 🌙 Moon Phase, AQI, Sunrise/Sunset tracking<br>
-• 🔧 No code modification needed - Auto WiFi setup<br>
-• ⏰ 15-minute update intervals with power-saving sleep
+### 🎮 Smart Features
+• 🌙 Moon Phase & Day/Night Tracking  
+• 🔄 Auto WiFi Configuration  
+• ⏰ Power-efficient Sleep Modes  
+• 📊 Environmental Monitoring
 
 ## 📊 Battery Performance
 
@@ -114,28 +146,165 @@ High/Low Tracking | Real-time Updates | Smart Power Management | Auto Configurat
 ## 🌱 Eco-Friendly Features
 
 - 📱 E-Paper Display (no backlight needed)
-- 🔋 Long-lasting battery life
+- 🔋 LiFePO4 Batteries (Lithium Iron Phosphate)
+  - ✅ Cobalt-free chemistry, reducing environmental impact
+  - ✅ 2-3x longer lifespan than traditional Li-ion
+  - ✅ Non-toxic and more stable chemistry
+  - ✅ Better recyclability due to simpler composition
 - 📦 Recycled cardboard construction
 - 💡 Smart light sensor for power saving
 
-## 🛠️ Technical Specs
+## 💫 Technical Specifications
 
-- 💻 USB-C connectivity
-- ⚡ 5V 1000mA charging (TP5000)
-- 📚 GxEPD2 Library compatible
+<details>
+<summary>🧠 Core System</summary>
+
+### Core Components
+- 💻 XIAO ESP32 C6
+  - 32-bit RISC-V single-core CPU up to 160MHz
+  - 320KB SRAM, 4MB Flash
+  - WiFi 6 & Bluetooth 5.0
+  - Ultra-low power consumption: 10µA in deep sleep
+  - 11 Digital/Analog pins
+  - USB-C interface
+
+</details>
+
+<details>
+<summary>📡 Sensors & Connectivity</summary>
+
+### Sensors
+- 🌡️ TMP117 High-Precision Temperature Sensor
+  - ±0.1°C (max) from -20°C to +50°C
+  - 16-bit resolution (0.0078°C)
+  - Low power: 3.5µA in shutdown mode
+  - Temperature range: -55°C to +150°C
+  
+- 💨 Bosch BME680 Environmental Sensor
+  - Humidity: ±3% accuracy
+  - Pressure: ±0.6 hPa absolute accuracy
+  - Gas sensor for air quality
+  - Temperature range: -40°C to +85°C
+  
+- 💡 BH1750 Light Sensor
+  - 1 - 65535 lux range
+  - 16-bit resolution
+  - Spectral responsivity close to human eye
+  - Low power: 120µA active mode
+  
+- ⏰ DS3231 RTC Module
+  - Accuracy: ±2ppm (±0.432 sec/day)
+  - Temperature compensated crystal
+  - Battery backup support
+  - -40°C to +85°C operating range
+
+</details>
+
+<details>
+<summary>⚡ Power System</summary>
+
+### Power & Display
+- 🔋 IFR26700 LiFePO4 Battery
+  - Nominal voltage: 3.2V
+  - Capacity: 4000mAh (8000mAh total with 2 cells)
+  - Cycle life: >2000 cycles
+  - Size: 26mm × 70mm
+  - Max discharge current: 8A
+  - Operating temperature: -20°C to +60°C
+  - Self-discharge rate: <3% monthly
+
+- ⚡ TP5000 Charging Module
+  - Input voltage: 4.5-8V
+  - Charging current: 1000mA (adjustable)
+  - Charging accuracy: ±1.5%
+  - LiFePO4 mode: 3.6V cutoff
+  - Over-voltage protection
+  - Temperature protection
+  - Short circuit protection
+
+- 📟 Waveshare 4.2" E-Paper Display
+  - Resolution: 400×300 pixels
+  - Three colors: Black, White, Red
+  - Active area: 84.8mm × 63.6mm
+  - Refresh time: 15 seconds
+  - Viewing angle: >170°
+  - Operating voltage: 3.3V
+  - Ultra-low power consumption
+  - No backlight needed
+  - SPI interface
+
+</details>
+
+## 🌿 Environmental Impact
+
+<table>
+<tr>
+<td width="50%">
+
+### 🔋 Power Efficiency
+- 📱 No backlight needed
+- 💤 Smart sleep modes
+- ⚡ Low power sensors
+- 🔆 Ambient light detection
+
+</td>
+<td width="50%">
+
+### ♻️ Sustainability
+- 🌱 Eco-friendly batteries
+- 📦 Recycled materials
+- 🔄 Long lifecycle
+- 🌍 Low carbon footprint
+
+</td>
+</tr>
+</table>
+
+## 🤝 Contributing
+
+<div align="center">
+
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
+[![Contributors](https://img.shields.io/github/contributors/desiFish/ESP32-ePaper-Display-Weather-Clock.svg?style=flat-square)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/graphs/contributors)
+
+</div>
+
+## 📝 License & Credits
+
+<table>
+<tr>
+<td>
+
+### 📜 License
+GNU General Public License v3.0
+- ✅ Freedom to use commercially
+- ✅ Freedom to modify
+- ✅ Freedom to distribute
+- ❗ Must be open source
+- ❗ Must preserve copyright
+- ❗ Must use same license
+
+</td>
+<td>
+
+### 👏 Credits
 - 🎨 Weather icons by SeBassTian23
+- 📚 GxEPD2 Library
+- 💻 Community Contributors
 
-## 📝 License
-
-Feel free to distribute with attribution! Consider:
-- 🔗 Linking back to this project
-- ⭐ Giving it a star
-- 💝 Supporting via PayPal (link in profile)
-
-> ⚠️ Disclaimer: Use at your own risk. No responsibility taken for any damages.
+</td>
+</tr>
+</table>
 
 ---
+
 <div align="center">
-  Made with 💖 and ♻️ materials
+  
+### Made with 💖 and ♻️ materials
+
+<br>
+
+[![Star This Project](https://img.shields.io/github/stars/desiFish/ESP32-ePaper-Display-Weather-Clock?style=social)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/stargazers)
+
 </div>
 
