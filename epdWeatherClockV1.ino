@@ -1,7 +1,10 @@
-// Weather icon credits: https://github.com/SeBassTian23/ESP32-WeatherDisplay/tree/master
+//=============== HEADER SECTION ===============
 
-// base class GxEPD2_GFX can be used to pass references or pointers to the display instance as parameter, uses ~1.2k more code
-// enable or disable GxEPD2_GFX base class
+// E-paper weather clock v1 - Main code
+// Uses GxEPD2 library for e-paper display control
+
+//=============== CONFIGURATION ===============
+// Enable/disable GxEPD2_GFX base class - uses ~1.2k more code
 #define ENABLE_GxEPD2_GFX 0
 
 #include <GxEPD2_3C.h>
@@ -197,23 +200,29 @@ BH1750 lightMeter(0x23); // Initalize light sensor
 GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS=5*/ /* SS*/ D7, /*DC=*/D1, /*RST=*/D2, /*BUSY=*/D3)); // 400x300, UC8276
 U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 
-// #define SEALEVELPRESSURE_HPA (1013.25)
-#define BATPIN A0 // battery voltage divider connection pin (1M Ohm with 104 Capacitor)
-#define DEBUG_PIN D6
-#define BATTERY_LEVEL_SAMPLING 4
-#define uS_TO_S_FACTOR 1000000 /* Conversion factor for micro seconds to seconds */
-int TIME_TO_SLEEP = 900;
+//=============== GLOBAL CONSTANTS ===============
+// Hardware pins
+#define BATPIN A0    // Battery voltage divider pin (1M Ohm with 104 Capacitor)
+#define DEBUG_PIN D6 // Debug mode toggle pin
 
-// battery related settings
-#define battType 3.6 // for ICR 4.2, for LFR 3.6
-#define battChangeThreshold 0.15
-#define battUpperLim 3.3 // for ICR or LiPo battery 4.19
-#define battHigh 3.4     // for ICR or LiPo battery 4.2
-#define battLow 2.9
+// Battery monitoring settings
+#define BATTERY_LEVEL_SAMPLING 4 // Number of samples to average
+#define battType 3.6             // Battery type voltage (ICR: 4.2, LFR: 3.6)
+#define battChangeThreshold 0.15 // Threshold for battery level changes
+#define battUpperLim 3.3         // Upper voltage limit
+#define battHigh 3.4             // Ideal battery voltage threshold (ICR: 4.1, LFR: 3.4)
+#define battLow 2.9              // Low battery threshold
 
-int nightFlag = 0; // preserves data in rtc memory from deep sleep loss
-float battLevel;
-bool DEBUG_MODE = false, BATTERY_CRITICAL = false;
+// Sleep settings
+#define uS_TO_S_FACTOR 1000000 // Micro seconds to seconds conversion
+int TIME_TO_SLEEP = 900;       // Default sleep time in seconds (15 mins)
+
+//=============== GLOBAL VARIABLES ===============
+// State variables
+int nightFlag = 0;             // Night mode state preserved across sleep
+float battLevel;               // Current battery level
+bool DEBUG_MODE = false;       // Debug mode state
+bool BATTERY_CRITICAL = false; // Critical battery state
 
 String jsonBuffer;
 
@@ -225,7 +234,8 @@ char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
 
 int httpResponseCode;
 
-// takes samples based on BATTERY_LEVEL_SAMPLING, averages them and returns actual battery voltage
+//=============== HELPER FUNCTIONS ===============
+// Measures and returns the averaged battery voltage
 float batteryLevel()
 {
   uint32_t Vbatt = 0;
@@ -239,11 +249,23 @@ float batteryLevel()
   return (Vbattf);
 }
 
+// Disables WiFi and reduces CPU frequency to save power
+void turnOffWifi()
+{
+  WiFi.disconnect(true);  // Disconnect from the network
+  WiFi.mode(WIFI_OFF);    // Switch WiFi off
+  setCpuFrequencyMhz(40); // Set CPU to 40MHz
+  delay(1);
+  Serial.println("WIFI OFF");
+}
+
 // forward declaration
 void tempPrint(byte offset = 0);
 
+//=============== MAIN SETUP AND LOOP ===============
 void setup()
 {
+  setCpuFrequencyMhz(80);
   Serial.begin(115200);
   Serial.println("Setup");
   pinMode(BATPIN, INPUT);
@@ -271,7 +293,28 @@ void setup()
   }
   nightFlag = pref.getBool("nightFlag", false);
 
-  if (!BATTERY_CRITICAL)
+  if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
+  {
+    Serial.println(F("BH1750 Advanced begin"));
+  }
+  else
+  {
+    Serial.println(F("Error initialising BH1750"));
+    errMsg("Error BH1750");
+    while (1)
+      ; // Runs forever
+  }
+  float lux = 0;
+  while (!lightMeter.measurementReady(true))
+  {
+    yield();
+  }
+  lux = lightMeter.readLightLevel(); // Get Lux value
+  Serial.print("Light: ");
+  Serial.print(lux);
+  Serial.println(" lx");
+
+  if (!BATTERY_CRITICAL && lux != 0)
   {
     bool wifiConfigExist = pref.isKey("ssid");
     if (!wifiConfigExist)
@@ -334,49 +377,31 @@ void setup()
         ;
     }
   }
-  if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
-  {
-    Serial.println(F("BH1750 Advanced begin"));
-  }
-  else
-  {
-    Serial.println(F("Error initialising BH1750"));
-    errMsg("Error BH1750");
-    while (1)
-      ; // Runs forever
-  }
-  float lux = 0;
-  while (!lightMeter.measurementReady(true))
-  {
-    yield();
-  }
-  lux = lightMeter.readLightLevel();
-  Serial.print("Light: ");
-  Serial.print(lux);
-  Serial.println(" lx");
 
-  if (!rtc.begin())
-  {
-    Serial.println("Couldn't find RTC");
-    errMsg("Error RTC");
-    while (1)
-      ; // Runs forever
-  }
-  Serial.println("RTC Ready");
-
-  DateTime now = rtc.now();
-
-  if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
-  { // reset high low at midnight
-    pref.putFloat("hTemp", 0.0);
-    pref.putFloat("lTemp", 60.0);
-  }
+  float hTempHold, lTempHold, tempBattLevel;
 
   if (lux != 0 || DEBUG_MODE == true)
   {
+    if (!rtc.begin())
+    {
+      Serial.println("Couldn't find RTC");
+      errMsg("Error RTC");
+      while (1)
+        ; // Runs forever
+    }
+    Serial.println("RTC Ready");
+
+    DateTime now = rtc.now();
+
+    if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
+    { // reset high low at midnight
+      pref.putFloat("hTemp", 0.0);
+      pref.putFloat("lTemp", 60.0);
+    }
+
     if (sensor.begin() == true) // Function to check if the sensor will correctly self-identify with the proper Device ID/Address
     {
-      Serial.println("Lux Begin");
+      Serial.println("TMP117 Begin");
     }
     else
     {
@@ -429,12 +454,7 @@ void setup()
       customApiKey = pref.getString("apiCustom", "");
     }
     else
-    {
-      // wifioff cpu speed reduced
-      WiFi.disconnect(true); // Disconnect from the network
-      WiFi.mode(WIFI_OFF);   // Switch WiFi off
-      setCpuFrequencyMhz(40);
-    }
+      turnOffWifi(); // wifioff cpu speed reduced
 
     hTemp = pref.getFloat("hTemp", -1.0);
     lTemp = pref.getFloat("lTemp", -1.0);
@@ -446,8 +466,9 @@ void setup()
       pref.putFloat("lTemp", 60.0);
       pref.putFloat("battLevel", battType);
     }
+
+    hTempHold = hTemp, lTempHold = lTemp, tempBattLevel = battLevel;
   }
-  float hTempHold = hTemp, lTempHold = lTemp, tempBattLevel = battLevel;
   bool tempNightFlag = nightFlag;
 
   Serial.println("Setup done");
@@ -494,7 +515,8 @@ void setup()
         }
         else
         {
-          Serial.println("Time");
+          turnOffWifi(); // turn off wifi if not connected
+          Serial.println("Time Only");
           display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK);
           tempPrint(40);
           Serial.println("Time Done");
@@ -522,19 +544,24 @@ void setup()
 
     Serial.println("Data Write Done");
     pref.end();
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
+
+    // Disable peripherals
+    Wire.end();
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     // Go to sleep now
     Serial.println("Going to sleep now");
     Serial.flush();
-    delay(100);
+    delay(10);
+    // Enter deep sleep
     esp_deep_sleep_start();
   }
 }
 
 void loop() {}
 
-// Handles the httpresponse and returns the data as json payload
+//=============== WEATHER AND DISPLAY FUNCTIONS ===============
+// Fetches weather data from API and returns JSON response
 String weatherDataAPI(const char *serverName)
 {
   WiFiClient client;
@@ -920,6 +947,9 @@ void weatherPrint()
       u8g2Fonts.print(s);
     }
   }
+
+  // Turn off WiFi as soon as possible after data fetch
+  turnOffWifi();
 }
 
 // UNCOMMENT BELOW FUNCTION IF YOU WISH TO USE ONLY oPENwEATHERmAP API
@@ -1104,8 +1134,11 @@ void weatherPrint()
       u8g2Fonts.print(s);
     }
   }
+  // Turn off WiFi as soon as possible after data fetch
+  turnOffWifi();
 }*/
 
+//=============== UI HELPER FUNCTIONS ===============
 // In case of api failure, it displays network info for debugging
 void networkInfo()
 {
