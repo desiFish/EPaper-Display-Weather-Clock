@@ -97,6 +97,8 @@
 
 ## 📊 Battery Performance
 
+> 📝 **Note**: This data is from testing with Li-ion ICR batteries. New performance data with 8000mAh LFP batteries (which are more cost-effective) coming soon!
+
 <table>
   <tr>
     <th>Cycle</th>
@@ -121,11 +123,14 @@
 </table>
 
 <div align="center">
-  <h4>📉 Battery Life Trend</h4>
+  <h4>📉 Battery Life Trend (ICR Battery Data)</h4>
   First: ████████████████████ 73 days<br>
   Second: █████████████ 49 days<br>
   Third: █████████████ 48 days
 </div>
+
+### Current Consumption
+> ⚠️ **Note**: Precise current consumption measurements for the entire project are not available due to equipment limitations. Please refer to the Battery Performance section above for real-world usage data and longevity estimates.
 
 ## 📸 Gallery
 
@@ -174,13 +179,21 @@
 <summary>🧠 Core System</summary>
 
 ### Core Components
-- 💻 XIAO ESP32 C6
+- 💻 **XIAO ESP32 C6** (Recommended)
   - 32-bit RISC-V single-core CPU up to 160MHz
   - 320KB SRAM, 4MB Flash
   - WiFi 6 & Bluetooth 5.0
-  - Ultra-low power consumption: 14µA in deep sleep
+  - Ultra-low power consumption: ~15µA in deep sleep
   - 11 Digital/Analog pins
   - USB-C interface
+
+### Power Consumption Comparison
+- ⚡ **Deep Sleep Current**:
+  - XIAO ESP32 C6: ~15µA (Recommended for this project)
+  - XIAO ESP32 C3: Higher deep sleep current
+  - XIAO ESP32 S3: Potentially lower deep sleep current (untested)
+    - Not used due to project's modest performance needs
+    - Could be viable alternative for maximum battery life
 
 </details>
 
@@ -332,11 +345,21 @@
 
 ### USB Charging Safety
 - ⚡ **USB Connection Warning**: Disconnect battery when connecting USB to ESP32C6
-  - ESP32C6 will attempt to charge 3.6V cells to 4.2V
-  - Dedicated USB-C charging module recommended
+  - XIAO modules are designed for LiPo/Li-ion batteries (4.2V charging)
+  - Not compatible with LFP battery charging (3.6V required)
+  - Dedicated USB-C module recommended
   - Connect USB-C module output to TP5000 input
   - Detailed schematics will be provided later
   - Simple setup despite complex explanation
+
+### Voltage Compatibility
+- ✅ **Operating Range**: 
+  - All components work perfectly with LFP's lower voltage
+  - Tested operational down to 2.8V
+  - No impact on battery life or performance
+  - LFP cells maintain stable 3.2V for extended periods
+  - 6+ months of testing
+  - Components designed for wide voltage range operation
 
 ### Enclosure Design
 - 💨 **Ventilation Requirements**: 
