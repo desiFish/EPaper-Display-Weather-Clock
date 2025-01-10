@@ -97,7 +97,9 @@
 
 ## 📊 Battery Performance
 
-> 📝 **Note**: This data is from testing with Li-ion ICR batteries. New performance data with 8000mAh LFP batteries (which are more cost-effective) coming soon!
+> 📝 **Note**: Historical data below is from testing with Li-ion ICR batteries. The shorter duration in cycles 2 and 3 (49 and 48 days vs 73 days) was due to incomplete charging (batteries not reaching full 4.2V). New performance data with 8000mAh LFP batteries (which are more cost-effective) is being collected.
+
+### ICR Battery Data
 
 <table>
   <tr>
@@ -119,6 +121,22 @@
     <td>Third Cycle</td>
     <td>48 Days</td>
     <td>~7 weeks</td>
+  </tr>
+</table>
+
+### LFP Battery Data (Ongoing)
+<table>
+  <tr>
+    <th>Cycle</th>
+    <th>Full Charge Date</th>
+    <th>Battery Dead Date</th>
+    <th>Duration</th>
+  </tr>
+  <tr>
+    <td>First Cycle</td>
+    <td>January 09, 2025</td>
+    <td>Coming Soon</td>
+    <td>Ongoing</td>
   </tr>
 </table>
 
