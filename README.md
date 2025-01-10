@@ -1,11 +1,18 @@
 <div align="center">
-
-# 🌡️ Minimalistic E-Paper Weather Station
-
-[![Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![License](https://img.shields.io/github/license/desiFish/ESP32-ePaper-Display-Weather-Clock)](/LICENSE)
-[![GitHub Issues](https://img.shields.io/github/issues/desiFish/ESP32-ePaper-Display-Weather-Clock.svg)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/issues)
-[![Release](https://img.shields.io/github/v/release/desiFish/ESP32-ePaper-Display-Weather-Clock)](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases)
+  <h1>🌡️ Minimalistic E-Paper Weather Station</h1>
+  <p>
+    <img src="https://img.shields.io/badge/ESP32-C6-blue?style=flat-square&logo=espressif"/>
+    <img src="https://img.shields.io/badge/Battery-8000mAh-green?style=flat-square"/>
+    <img src="https://img.shields.io/badge/Display-4.2%22-orange?style=flat-square"/>
+    <img src="https://img.shields.io/badge/Eco-Friendly-brightgreen?style=flat-square"/>
+  </p>
+  <p>
+    <img src="https://img.shields.io/badge/status-active-success.svg" alt="Status">
+    <a href="/LICENSE"><img src="https://img.shields.io/github/license/desiFish/ESP32-ePaper-Display-Weather-Clock" alt="License"></a>
+    <a href="https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/issues"><img src="https://img.shields.io/github/issues/desiFish/ESP32-ePaper-Display-Weather-Clock.svg" alt="GitHub Issues"></a>
+    <a href="https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases"><img src="https://img.shields.io/github/v/release/desiFish/ESP32-ePaper-Display-Weather-Clock" alt="Release"></a>
+  </p>
+</div>
 
 <p align="center">
   <i>🌈 A beautiful, eco-friendly weather station powered by E-Paper display! 🌱</i>
