@@ -364,7 +364,7 @@
 - ⚡ **Current Draw**: This project's extremely low current consumption (well below rated cell capacity) makes the parallel configuration safer
 - 🛡️ **Protection**: Always use proper BMS protection for your cells
 - 📝 **BMS Setup**: Due to limited 1S LiFePO4 BMS availability:
-  - Using 4.2V BMS for 2.5V cutoff protection
+  - Using 4.2V BMS for 2.5V cutoff protection (Low Discharge Cutoff)
   - TP5000 connected directly to cells for proper 3.6V charging
   - This is a temporary solution until better 1S LFP BMS options become available
 
