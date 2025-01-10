@@ -13,6 +13,8 @@
 
 </div>
 
+> ⚠️ **IMPORTANT**: Please read the [Notes & Warnings] section carefully before proceeding with this project. It contains crucial safety information about battery configuration, charging, and sensor placement.
+
 <div align="center">
 
 ### 🌟 Smart • Efficient • Eco-Friendly 🌟
@@ -311,6 +313,44 @@
 </td>
 </tr>
 </table>
+
+## ⚠️ Important Notes & Warnings
+
+### Battery Configuration Safety
+- 🔋 **Parallel Cell Configuration**: While this project uses two LiFePO4 cells in parallel, this is generally not recommended with TP5000 or similar charging circuits
+  - Currently safe due to verified cell balance
+  - Long-term balance cannot be guaranteed
+  - Only implemented due to ultra-low current draw
+
+### Power Management Considerations
+- ⚡ **Current Draw**: This project's extremely low current consumption (well below rated cell capacity) makes the parallel configuration safer
+- 🛡️ **Protection**: Always use proper BMS protection for your cells
+- 📝 **BMS Setup**: Due to limited 1S LiFePO4 BMS availability:
+  - Using 4.2V BMS for 2.5V cutoff protection
+  - TP5000 connected directly to cells for proper 3.6V charging
+  - This is a temporary solution until better 1S LFP BMS options become available
+
+### USB Charging Safety
+- ⚡ **USB Connection Warning**: Disconnect battery when connecting USB to ESP32C6
+  - ESP32C6 will attempt to charge 3.6V cells to 4.2V
+  - Dedicated USB-C charging module recommended
+  - Connect USB-C module output to TP5000 input
+  - Detailed schematics will be provided later
+  - Simple setup despite complex explanation
+
+### Enclosure Design
+- 💨 **Ventilation Requirements**: 
+  - Proper air vents are crucial
+  - Ensures accurate sensor readings
+  - Prevents heat buildup
+  - Essential for environmental monitoring
+- 🔧 **Sensor Orientation**:
+  - TMP117 and BME680 must be mounted horizontally
+  - Sensors should face downward
+  - Prevents dust and particle accumulation
+  - Ensures accurate long-term readings
+
+> ⚠️ **Please consider these points carefully before replicating this setup. Battery safety is crucial!**
 
 ## 🤝 Contributing
 
