@@ -7,31 +7,33 @@
 // Enable/disable GxEPD2_GFX base class - uses ~1.2k more code
 #define ENABLE_GxEPD2_GFX 0
 
-#include <GxEPD2_3C.h>
+#include <GxEPD2_3C.h> // 3-color e-paper display
 #include <Fonts/FreeMonoBold9pt7b.h>
-#include <U8g2_for_Adafruit_GFX.h>
-#include <Wire.h> // Used to establish serial communication on the I2C bus
-#include <SparkFun_TMP117.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_BME680.h"
-#include "RTClib.h"
-#include "image.h" //for sleep icon
+#include <U8g2_for_Adafruit_GFX.h> // Include U8g2 fonts
+#include <Wire.h>                  // Used to establish serial communication on the I2C bus
+#include <SparkFun_TMP117.h>       // TMP117 temperature sensor library
+#include <Adafruit_Sensor.h>       // Adafruit sensor library
+#include "Adafruit_BME680.h"       // BME680 environmental sensor library
+#include "RTClib.h"                // RTC library
+#include "image.h"                 //for sleep icon
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Arduino_JSON.h>
-#include <BH1750.h>
-#include <TimeLib.h>
-#include "icons.h"
+#include <BH1750.h>  // Light sensor library
+#include <TimeLib.h> // for time functions
+#include "icons.h"   // for weather icons
 
 #include <Arduino.h>
-#include <ESPAsyncWebServer.h>
-#include <AsyncTCP.h>
-#include <Preferences.h>
+#include <ESPAsyncWebServer.h> // for web server
+#include <AsyncTCP.h>          // for tcp connection
+#include <Preferences.h>       // for storing data in flash memory
 
+//=============== GLOBAL OBJECTS =================
 Preferences pref;
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
+//=============== HTML CODE =================
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -197,8 +199,9 @@ TMP117 sensor;           // Initalize temperature sensor
 Adafruit_BME680 bme;     // Initalize environmental sensor
 BH1750 lightMeter(0x23); // Initalize light sensor
 
+// Initalize display
 GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS=5*/ /* SS*/ D7, /*DC=*/D1, /*RST=*/D2, /*BUSY=*/D3)); // 400x300, UC8276
-U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
+U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;                                                                                                       // u8g2 fonts
 
 //=============== GLOBAL CONSTANTS ===============
 // Hardware pins
@@ -224,7 +227,7 @@ float battLevel;               // Current battery level
 bool DEBUG_MODE = false;       // Debug mode state
 bool BATTERY_CRITICAL = false; // Critical battery state
 
-String jsonBuffer;
+String jsonBuffer; // for storing json data from api
 
 // for storing highest temp and lowest temp of the day
 float hTemp, lTemp;
@@ -232,7 +235,7 @@ float hTemp, lTemp;
 char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-int httpResponseCode;
+int httpResponseCode; // for storing http response code
 
 //=============== HELPER FUNCTIONS ===============
 // Measures and returns the averaged battery voltage
@@ -265,16 +268,16 @@ void tempPrint(byte offset = 0);
 //=============== MAIN SETUP AND LOOP ===============
 void setup()
 {
-  setCpuFrequencyMhz(80);
+  setCpuFrequencyMhz(80); // Set CPU to 80MHz
   Serial.begin(115200);
   Serial.println("Setup");
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
-  if (digitalRead(DEBUG_PIN) == 1)
+  if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
     DEBUG_MODE = true;
-  Wire.begin();
-  Wire.setClock(400000); // Set clock speed to be the fastest for better communication (fast mode)
-  analogReadResolution(12);
+  Wire.begin();                         // Start the I2C communication
+  Wire.setClock(400000);                // Set clock speed to be the fastest for better communication (fast mode)
+  analogReadResolution(12);             // Set ADC resolution to 12-bit
   display.init(115200, true, 2, false); // USE THIS for Waveshare boards with "clever" reset circuit, 2ms reset pulse
 
   u8g2Fonts.begin(display); // connect u8g2 procedures to Adafruit GFX
@@ -307,15 +310,16 @@ void setup()
   float lux = 0;
   while (!lightMeter.measurementReady(true))
   {
-    yield();
+    yield(); // Wait for the measurement to be ready
   }
-  lux = lightMeter.readLightLevel(); // Get Lux value
+  lux = lightMeter.readLightLevel(); // Get Lux value from sensor
   Serial.print("Light: ");
   Serial.print(lux);
   Serial.println(" lx");
 
   if (!BATTERY_CRITICAL && lux != 0)
   {
+    // if battery is critical, then no need to check wifi and weather api
     bool wifiConfigExist = pref.isKey("ssid");
     if (!wifiConfigExist)
     { // create key:value pairs
@@ -328,6 +332,7 @@ void setup()
 
     if (ssid == "" || password == "")
     {
+      // if no ssid or password saved, then start the wifi manager
       Serial.println("No values saved for ssid or password");
       // Connect to Wi-Fi network with SSID and password
       Serial.println("Setting AP (Access Point)");
@@ -382,6 +387,7 @@ void setup()
 
   if (lux != 0 || DEBUG_MODE == true)
   {
+    // if lux is 0, then the device is in dark mode and no need to initialize sensors
     if (!rtc.begin())
     {
       Serial.println("Couldn't find RTC");
@@ -399,7 +405,7 @@ void setup()
       pref.putFloat("lTemp", 60.0);
     }
 
-    if (sensor.begin() == true) // Function to check if the sensor will correctly self-identify with the proper Device ID/Address
+    if (sensor.begin() == true) // Function to check if the TMP117 will correctly self-identify with the proper Device ID/Address
     {
       Serial.println("TMP117 Begin");
     }
@@ -430,6 +436,7 @@ void setup()
 
     if (!BATTERY_CRITICAL)
     {
+      // Connect to Wi-Fi network with SSID and password if battery is not critical
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid.c_str(), password.c_str());
       while (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -438,9 +445,10 @@ void setup()
         break;
       }
 
-      Serial.println("WIFI Connected");
+      Serial.println("IP Address: ");
       Serial.println(WiFi.localIP());
 
+      // Check if the API keys are saved in the preferences
       bool apiConfigExist = pref.isKey("api");
       if (!apiConfigExist) // create key:value pairs
         pref.putString("api", openWeatherMapApiKey);
@@ -454,7 +462,7 @@ void setup()
       customApiKey = pref.getString("apiCustom", "");
     }
     else
-      turnOffWifi(); // wifioff cpu speed reduced
+      turnOffWifi(); // wifioff cpu speed reduced to save power
 
     hTemp = pref.getFloat("hTemp", -1.0);
     lTemp = pref.getFloat("lTemp", -1.0);
@@ -475,7 +483,7 @@ void setup()
 
   if (DEBUG_MODE)
   {
-    errMsg("DEBUG MODE");
+    errMsg("DEBUG MODE"); // Display debug message
   }
   else
   {
@@ -509,8 +517,8 @@ void setup()
         if (WiFi.status() == WL_CONNECTED)
         {
           Serial.println("Time And Weather");
-          tempPrint();
-          weatherPrint();
+          tempPrint();    // prints temperature and battery level
+          weatherPrint(); // prints weather data
           Serial.println("Time And Weather Done");
         }
         else
@@ -518,7 +526,7 @@ void setup()
           turnOffWifi(); // turn off wifi if not connected
           Serial.println("Time Only");
           display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK);
-          tempPrint(40);
+          tempPrint(40); // offset for wifi off which shifts the temperature display to the middle
           Serial.println("Time Done");
         }
       } while (display.nextPage());
@@ -529,7 +537,7 @@ void setup()
     Serial.println("Data Write");
 
     if (lux != 0)
-    {
+    { // if lux is 0, then the device is in dark mode and no need to save data
       if (hTempHold != hTemp)
         pref.putFloat("hTemp", hTemp);
       if (lTempHold != lTemp)
@@ -539,26 +547,27 @@ void setup()
       if (tempBATTERY_CRITICAL != BATTERY_CRITICAL)
         pref.putBool("battCrit", BATTERY_CRITICAL);
     }
-    if (tempNightFlag != nightFlag)
+    if (tempNightFlag != nightFlag) // if night mode changes, then save the new state
       pref.putBool("nightFlag", nightFlag);
 
     Serial.println("Data Write Done");
-    pref.end();
+    pref.end(); // Close the preferences
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
 
-    // Disable peripherals
-    Wire.end();
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    Wire.end();                                                    // End I2C communication
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
     // Go to sleep now
     Serial.println("Going to sleep now");
-    Serial.flush();
-    delay(10);
+    Serial.flush(); // Flush the serial buffer
+    delay(10);      // Delay to ensure all the serial data is sent
     // Enter deep sleep
     esp_deep_sleep_start();
   }
 }
 
-void loop() {}
+void loop()
+{ // Empty loop function
+}
 
 //=============== WEATHER AND DISPLAY FUNCTIONS ===============
 // Fetches weather data from API and returns JSON response
@@ -592,8 +601,8 @@ String weatherDataAPI(const char *serverName)
   return payload;
 }
 
-/*tempPrint function prints internal sensor based readings. If offset is provided then it shifts in y axis.
-Provide offset when wifi is not connected and online weather data cannot be printed.*/
+// Prints weather data on the display
+// offset is used to shift the temperature display to the middle when wifi is off
 void tempPrint(byte offset)
 {
   uint16_t bg = GxEPD_WHITE;
@@ -778,15 +787,6 @@ void weatherPrint()
     return;
   }
 
-  /*Serial.print("JSON object = ");
-  Serial.println(myObject);
-  Serial.print("Temperature: ");
-  Serial.println(myObject["current"]["temp"]);
-  Serial.print("Pressure: ");
-  Serial.println(myObject["current"]["pressure"]);
-  Serial.print("Humidity: ");
-  Serial.println(myObject["current"]["humidity"]);*/
-
   if (myObject["current"]["temp"] == null)
   {
     networkInfo();
@@ -952,9 +952,7 @@ void weatherPrint()
   turnOffWifi();
 }
 
-// UNCOMMENT BELOW FUNCTION IF YOU WISH TO USE ONLY oPENwEATHERmAP API
-// COMMENT OR REMOVE THE OTHER FUNCTION WITH THE SAME NAME
-
+// UNCOMMENT BELOW FUNCTION AND REMOVE THE ABOVE FUNCTION WITH THE SAME NAME IF YOU WISH TO USE ONLY oPENwEATHERmAP API
 /*
 void weatherPrint()
 {
