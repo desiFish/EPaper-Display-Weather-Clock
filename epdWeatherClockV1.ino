@@ -1,3 +1,20 @@
+/*
+epdWeatherStation.ino
+Copyright (C) 2024 desiFish
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
 //=============== HEADER SECTION ===============
 
 // E-paper weather clock v1 - Main code
@@ -523,10 +540,10 @@ void setup()
         }
         else
         {
-          turnOffWifi(); // turn off wifi if not connected
+          turnOffWifi(); // turn off wifi to save power when wifi is not connected
           Serial.println("Time Only");
-          display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK);
-          tempPrint(40); // offset for wifi off which shifts the temperature display to the middle
+          display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
+          tempPrint(40);                                            // offset for wifi off which shifts the temperature display to the middle
           Serial.println("Time Done");
         }
       } while (display.nextPage());
