@@ -209,6 +209,7 @@
   - 320KB SRAM, 4MB Flash
   - WiFi 6 & Bluetooth 5.0
   - Ultra-low power consumption: ~15µA in deep sleep
+    - Note: 14-15µA deep sleep current only achievable when power is supplied through battery pins (BAT+ and BAT-)
   - 11 Digital/Analog pins
   - USB-C interface
 
