@@ -70,8 +70,9 @@
 <td width="50%" align="center">
   
 ### 🆕 Latest Version
-[**v0.2.0-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.0-beta)
-- 🚀 Power Efficiency improvements 
+[**v0.2.1-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.1-beta)
+- 🚀 Power and Memory Efficiency improvements 
+- 👻 Screen Ghosting protection added (Experimental)
   
 </td>
 <td width="50%" align="center">
@@ -285,6 +286,23 @@
   - Ultra-low power consumption
   - No backlight needed
   - SPI interface
+
+</details>
+
+<details>
+<summary>📟 Display & Ghosting</summary>
+
+### E-Paper Display Ghosting
+- 👻 **Ghosting Issue**: Even after using full scan/update mode, ghosting can occur
+  - Red lines may appear over black background
+  - Occurs when same elements stay static for extended periods
+  
+- 🛡️ **GhostProtek Mode**
+  - Automatically inverts display colors periodically
+  - Activates after predetermined number of boots
+  - Prevents static elements from burning in
+  - Helps maintain display longevity
+  - Experimental feature to reduce ghosting artifacts
 
 </details>
 

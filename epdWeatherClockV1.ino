@@ -200,6 +200,10 @@ const char *PARAM_INPUT_2 = "pass";
 String ssid;
 String password;
 
+// save number of boots
+RTC_DATA_ATTR int bootCount = 0;
+const byte ghostProtek = 2; // ghost protection, 2 means for every 2 boots, 1 boot will be in dark mode
+
 // openWeatherMap Api Key from your profile in account section
 String openWeatherMapApiKey = ""; // add your profile key here when running for the first time
 
@@ -254,6 +258,11 @@ char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
 
 int httpResponseCode; // for storing http response code
 
+// Define base URLs as const char arrays
+const char OPEN_WEATHER_BASE_URL[] = "http://api.openweathermap.org/data/3.0/onecall?lat=";
+const char OPEN_WEATHER_PARAMS[] = "&exclude=hourly,minutely&units=metric&appid=";
+const char CUSTOM_WEATHER_BASE_URL[] = "http://iotthings.pythonanywhere.com/api/weatherStation/serve?api_key=";
+
 //=============== HELPER FUNCTIONS ===============
 // Measures and returns the averaged battery voltage
 float batteryLevel()
@@ -280,7 +289,8 @@ void turnOffWifi()
 }
 
 // forward declaration
-void tempPrint(byte offset = 0);
+void tempPrint(byte offset = 0, bool invert = false);
+void weatherPrint(bool invert = false);
 
 //=============== MAIN SETUP AND LOOP ===============
 void setup()
@@ -290,6 +300,7 @@ void setup()
   Serial.println("Setup");
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
+  ++bootCount;                     // increment the boot count
   if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
     DEBUG_MODE = true;
   Wire.begin();                         // Start the I2C communication
@@ -302,7 +313,7 @@ void setup()
   pref.begin("database", false);
   BATTERY_CRITICAL = pref.isKey("battCrit");
   if (!BATTERY_CRITICAL)
-    pref.putBool("battCrit", "");
+    pref.putBool("battCrit", false);
   BATTERY_CRITICAL = pref.getBool("battCrit", false);
   bool tempBATTERY_CRITICAL = BATTERY_CRITICAL;
 
@@ -530,16 +541,26 @@ void setup()
       display.firstPage();
       do
       {
-        display.fillScreen(GxEPD_WHITE);
         if (WiFi.status() == WL_CONNECTED)
         {
           Serial.println("Time And Weather");
-          tempPrint();    // prints temperature and battery level
-          weatherPrint(); // prints weather data
+          if (bootCount == ghostProtek)
+          {
+            display.fillScreen(GxEPD_BLACK);
+            tempPrint(0, true); // prints temperature and battery level
+            weatherPrint(true); // prints weather data
+          }
+          else
+          {
+            display.fillScreen(GxEPD_WHITE);
+            tempPrint();    // prints temperature and battery level
+            weatherPrint(); // prints weather data
+          }
           Serial.println("Time And Weather Done");
         }
         else
         {
+          display.fillScreen(GxEPD_WHITE);
           turnOffWifi(); // turn off wifi to save power when wifi is not connected
           Serial.println("Time Only");
           display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
@@ -567,16 +588,19 @@ void setup()
     if (tempNightFlag != nightFlag) // if night mode changes, then save the new state
       pref.putBool("nightFlag", nightFlag);
 
+    if (bootCount == ghostProtek)
+      bootCount = 0;
+
     Serial.println("Data Write Done");
     pref.end(); // Close the preferences
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
 
     Wire.end();                                                    // End I2C communication
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
-    // Go to sleep now
+    //  Go to sleep now
     Serial.println("Going to sleep now");
     Serial.flush(); // Flush the serial buffer
-    delay(10);      // Delay to ensure all the serial data is sent
+    delay(5);       // Delay to ensure all the serial data is sent
     // Enter deep sleep
     esp_deep_sleep_start();
   }
@@ -620,161 +644,147 @@ String weatherDataAPI(const char *serverName)
 
 // Prints weather data on the display
 // offset is used to shift the temperature display to the middle when wifi is off
-void tempPrint(byte offset)
+void tempPrint(byte offset, bool invert)
 {
-  uint16_t bg = GxEPD_WHITE;
-  uint16_t fg = GxEPD_BLACK;
-  u8g2Fonts.setFontMode(1);         // use u8g2 transparent mode (this is default)
-  u8g2Fonts.setFontDirection(0);    // left to right (this is default)
-  u8g2Fonts.setForegroundColor(fg); // apply Adafruit GFX color
-  u8g2Fonts.setBackgroundColor(bg); // apply Adafruit GFX color
-                                    // select u8g2 font from here: https://github.com/olikraus/u8g2/wiki/fntlistall
-  float tempC;
-  if (sensor.dataReady() == true) // Function to make sure that there is data ready to be printed, only prints temperature values when data is ready
+  // Configure fonts and colors once at the start
+  uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
+  uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
+  uint16_t lineColor = (BATTERY_CRITICAL || invert) ? GxEPD_WHITE : GxEPD_RED;
+
+  u8g2Fonts.setFontMode(1);
+  u8g2Fonts.setFontDirection(0);
+  u8g2Fonts.setForegroundColor(fg);
+  u8g2Fonts.setBackgroundColor(bg);
+
+  // Temperature reading
+  float tempC = 0;
+  if (sensor.dataReady())
   {
     tempC = sensor.readTempC();
-    Serial.println(); // Create a white space for easier viewing
-    Serial.print("Temperature in Celsius: ");
-    Serial.println(tempC);
-    if (tempC > hTemp)
-      hTemp = tempC;
-    if (tempC < lTemp)
-      lTemp = tempC;
+    hTemp = max(hTemp, tempC);
+    lTemp = min(lTemp, tempC);
   }
 
+  // Battery level handling
   float newBattLevel = batteryLevel();
-  if (newBattLevel < battLevel) // to maintain steady decrease in battery level
-    battLevel = newBattLevel;
+  battLevel = (newBattLevel < battLevel) ? newBattLevel : ((newBattLevel - battLevel) >= battChangeThreshold || newBattLevel > battUpperLim) ? newBattLevel
+                                                                                                                                             : battLevel;
 
-  if (((newBattLevel - battLevel) >= battChangeThreshold) || newBattLevel > battUpperLim) // to update the battery level in case of charging
-    battLevel = newBattLevel;
-
+  // Battery display section
   u8g2Fonts.setFont(u8g2_font_luRS08_tf);
   u8g2Fonts.setCursor(28, 11);
   u8g2Fonts.print(battLevel, 2);
   u8g2Fonts.print("V");
 
-  int percent = ((battLevel - battLow) / (battHigh - battLow)) * 100; // range is battHigh - 100% and battLow - 0%
-  BATTERY_CRITICAL = false;
-  if (percent < 1)
-  {
-    BATTERY_CRITICAL = true;
-    percent = 0; // for battry icon
-  }
-  else if (percent > 100)
-    percent = 100;
+  int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
+  BATTERY_CRITICAL = percent < 1;
 
   u8g2Fonts.setCursor(63, 11);
   if (!BATTERY_CRITICAL)
   {
     u8g2Fonts.print(percent, 1);
     u8g2Fonts.print("%");
+    if (invert)
+    {
+      u8g2Fonts.setCursor(123, 11);
+      u8g2Fonts.print(" GHOSTING PROTECTION");
+    }
   }
   else
+  {
     u8g2Fonts.print("BATTERY CRITICAL, WIFI TURNED OFF");
-  iconBattery(display, percent);
+  }
+  iconBattery(display, percent, invert);
 
+  // Time and date display
   DateTime now = rtc.now();
+  char timeStr[6];
+  sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
 
-  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
   u8g2Fonts.setCursor(295, 11);
   u8g2Fonts.print("Last Update: ");
-  u8g2Fonts.print(now.hour() < 10 ? "0" + String(now.hour()) : now.hour());
-  u8g2Fonts.print(now.minute() < 10 ? ":0" + String(now.minute()) : ":" + String(now.minute()));
+  u8g2Fonts.print(timeStr);
 
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(10, 75 + offset);
-  u8g2Fonts.print(now.day() < 10 ? "0" + String(now.day()) : now.day());
+  u8g2Fonts.print(now.day() < 10 ? "0" : "");
+  u8g2Fonts.print(now.day());
   u8g2Fonts.print(", ");
   u8g2Fonts.print(monthName[now.month() - 1]);
   u8g2Fonts.setCursor(10, 105 + offset);
   u8g2Fonts.print(daysOfTheWeek[now.dayOfTheWeek()]);
 
+  // Main temperature display
   u8g2Fonts.setFont(u8g2_font_inb19_mf);
-  u8g2Fonts.setCursor(320, 60 + offset); // start writing at this position
+  u8g2Fonts.setCursor(320, 60 + offset);
   u8g2Fonts.print("o");
 
   u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
-  u8g2Fonts.setCursor(150, 110 + offset); // start writing at this position
-
+  u8g2Fonts.setCursor(150, 110 + offset);
   u8g2Fonts.print(String(tempC));
-
-  u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
   u8g2Fonts.setCursor(330, 110 + offset);
-  u8g2Fonts.print(String("C"));
+  u8g2Fonts.print("C");
 
-  if (!BATTERY_CRITICAL)
+  // Draw separator lines
+  for (int i = 0; i < 2; i++)
   {
-    display.drawLine(0, 121 + offset, 400, 121 + offset, GxEPD_RED);
-    display.drawLine(0, 122 + offset, 400, 122 + offset, GxEPD_RED);
-
-    display.drawLine(0, 154 + offset, 400, 154 + offset, GxEPD_RED);
-    display.drawLine(0, 155 + offset, 400, 155 + offset, GxEPD_RED);
-  }
-  else
-  {
-    display.drawLine(0, 121 + offset, 400, 121 + offset, GxEPD_BLACK);
-    display.drawLine(0, 122 + offset, 400, 122 + offset, GxEPD_BLACK);
-
-    display.drawLine(0, 154 + offset, 400, 154 + offset, GxEPD_BLACK);
-    display.drawLine(0, 155 + offset, 400, 155 + offset, GxEPD_BLACK);
+    display.fillRect(0, 121 + offset + (i * 33), 400, 2, lineColor);
   }
 
-  unsigned long endTime = bme.beginReading();
-  if (endTime == 0)
+  // Environmental readings
+  if (!bme.beginReading() || !bme.endReading())
   {
-    Serial.println(F("Failed to begin reading :("));
-    return;
-  }
-  if (!bme.endReading())
-  {
-    Serial.println(F("Failed to complete reading :("));
+    Serial.println("BME READING ERROR");
     return;
   }
 
+  // Display environmental data
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
-  u8g2Fonts.setCursor(2, 150 + offset); // start writing at this position
+  u8g2Fonts.setCursor(2, 150 + offset);
   u8g2Fonts.print(bme.humidity);
-  // u8g2Fonts.setCursor(67, 200);
-  u8g2Fonts.print(String("%"));
+  u8g2Fonts.print("%");
 
-  u8g2Fonts.setCursor(264, 150 + offset); // start writing at this position
+  u8g2Fonts.setCursor(264, 150 + offset);
   u8g2Fonts.print(bme.pressure / 100.0);
-  // u8g2Fonts.setCursor(186, 200);
-  u8g2Fonts.print(String("hPa"));
+  u8g2Fonts.print("hPa");
 
+  // High/Low temperature display
   u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
-  u8g2Fonts.setCursor(85, 148 + offset); // start writing at this position
-  u8g2Fonts.print("H:");
-  // u8g2Fonts.setCursor(30, 250);  // start writing at this position
-  u8g2Fonts.print(hTemp);
-  u8g2Fonts.setFont(u8g2_font_fub11_tf);
-  u8g2Fonts.setCursor(148, 138 + offset); // start writing at this position
-  u8g2Fonts.print("o");
-  u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
-  u8g2Fonts.setCursor(158, 148 + offset); // start writing at this position
-  u8g2Fonts.print("C");
+  const char *labels[] = {"H:", "L:"};
+  float temps[] = {hTemp, lTemp};
+  int positions[] = {85, 180};
 
-  u8g2Fonts.setCursor(180, 148 + offset); // start writing at this position
-  u8g2Fonts.print("L:");
-  u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
-  // u8g2Fonts.setCursor(30, 280);  // start writing at this position
-  u8g2Fonts.print(lTemp);
-  u8g2Fonts.setFont(u8g2_font_fub11_tf);
-  u8g2Fonts.setCursor(242, 138 + offset); // start writing at this position
-  u8g2Fonts.print("o");
-  u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
-  u8g2Fonts.setCursor(252, 148 + offset); // start writing at this position
-  u8g2Fonts.print("C");
+  for (int i = 0; i < 2; i++)
+  {
+    u8g2Fonts.setCursor(positions[i], 148 + offset);
+    u8g2Fonts.print(labels[i]);
+    u8g2Fonts.print(temps[i]);
+    u8g2Fonts.setFont(u8g2_font_fub11_tf);
+    u8g2Fonts.setCursor(positions[i] + 63, 138 + offset);
+    u8g2Fonts.print("o");
+    u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
+    u8g2Fonts.setCursor(positions[i] + 73, 148 + offset);
+    u8g2Fonts.print("C");
+  }
 }
 
 // works only if wifi is connected. Prints data from openweather api and custom weather station.
 // Use the other function with same name (COMMENTED) if you wish to use only OpenWeatherMap
-void weatherPrint()
+void weatherPrint(bool invert)
 {
-  String serverPath = "http://api.openweathermap.org/data/3.0/onecall?lat=" + lat + "&lon=" + lon + "&exclude=hourly,minutely&units=metric&appid=" + openWeatherMapApiKey;
+  uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
+  uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
+  uint16_t red = invert ? GxEPD_WHITE : GxEPD_RED;
 
-  jsonBuffer = weatherDataAPI(serverPath.c_str());
+  char serverPath[256];
+  strcpy(serverPath, OPEN_WEATHER_BASE_URL);
+  strcat(serverPath, lat.c_str());
+  strcat(serverPath, "&lon=");
+  strcat(serverPath, lon.c_str());
+  strcat(serverPath, OPEN_WEATHER_PARAMS);
+  strcat(serverPath, openWeatherMapApiKey.c_str());
+
+  jsonBuffer = weatherDataAPI(serverPath);
   if (httpResponseCode == -1 || httpResponseCode == -11)
     ESP.restart();
   Serial.println(jsonBuffer);
@@ -788,9 +798,10 @@ void weatherPrint()
     return;
   }
 
-  serverPath = "http://iotthings.pythonanywhere.com/api/weatherStation/serve?api_key=" + customApiKey;
-
-  jsonBuffer = weatherDataAPI(serverPath.c_str());
+  // Override with custom weather URL
+  strcpy(serverPath, CUSTOM_WEATHER_BASE_URL);
+  strcat(serverPath, customApiKey.c_str());
+  jsonBuffer = weatherDataAPI(serverPath);
   if (httpResponseCode == -1 || httpResponseCode == -11)
     ESP.restart();
   Serial.println(jsonBuffer);
@@ -807,10 +818,19 @@ void weatherPrint()
   if (myObject["current"]["temp"] == null)
   {
     networkInfo();
+    // Turn off WiFi as soon as possible after data fetch
+    turnOffWifi();
   }
   else
   {
-    wifiStatus();
+    wifiStatus(invert);
+    // Turn off WiFi as soon as possible after data fetch
+    turnOffWifi();
+    u8g2Fonts.setFontMode(1);
+    u8g2Fonts.setFontDirection(0);
+    u8g2Fonts.setForegroundColor(fg);
+    u8g2Fonts.setBackgroundColor(bg);
+
     u8g2Fonts.setFont(u8g2_font_helvB10_tf);
     u8g2Fonts.setCursor(29, 170);
     u8g2Fonts.print("OUTDOOR");
@@ -859,35 +879,36 @@ void weatherPrint()
       u8g2Fonts.print(" High");
     else if (uv > 7)
       u8g2Fonts.print(" Danger");
-    display.drawLine(136, 155, 136, 299, GxEPD_RED);
-    display.drawLine(137, 155, 137, 299, GxEPD_RED);
+
+    // Draw vertical divider line
+    display.fillRect(136, 155, 2, 144, red); // 144 = 299-155
 
     // Sunset sunrise print
-    time_t t = strtoll(JSON.stringify(myObject["current"]["sunrise"]).c_str(), nullptr, 10);
-    setTime(t);
-    adjustTime(19800);
-    iconSunRise(display, 152, 170, true);
-    u8g2Fonts.setCursor(166, 175); // start writing at this position
-    u8g2Fonts.print("0");
-    u8g2Fonts.print(hour());
-    u8g2Fonts.print(":");
-    u8g2Fonts.print(minute() < 10 ? "0" + String(minute()) : minute());
+    char timeBuffer[6];
+    for (int i = 0; i < 2; i++)
+    {
+      time_t t = strtoll(JSON.stringify(myObject["current"][i == 0 ? "sunrise" : "sunset"]).c_str(), nullptr, 10);
+      if (t > 0)
+      {
+        setTime(t);
+        adjustTime(19800); // UTC+5:30 offset
 
-    t = strtoll(JSON.stringify(myObject["current"]["sunset"]).c_str(), nullptr, 10);
-    setTime(t);
-    adjustTime(19800);
-    iconSunRise(display, 267, 170, false);
-    u8g2Fonts.setCursor(281, 175);
-    u8g2Fonts.print(hour());
-    u8g2Fonts.print(":");
-    u8g2Fonts.print(minute() < 10 ? "0" + String(minute()) : minute());
+        // Format time as HH:MM
+        snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", hour(), minute());
 
-    display.drawLine(320, 155, 320, 299, GxEPD_RED);
-    display.drawLine(321, 155, 321, 299, GxEPD_RED);
-    display.drawLine(320, 230, 400, 230, GxEPD_RED);
-    display.drawLine(320, 231, 400, 231, GxEPD_RED);
+        // Draw icon and time
+        iconSunRise(display, i == 0 ? 152 : 267, 170, i == 0, invert);
+        u8g2Fonts.setCursor(i == 0 ? 166 : 281, 175);
+        u8g2Fonts.print(timeBuffer);
+      }
+    }
 
-    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"]));
+    // Vertical divider line
+    display.fillRect(320, 155, 2, 144, red); // 144 = 299-155
+    // Horizontal divider line
+    display.fillRect(320, 230, 80, 2, red); // 80 = 400-320
+
+    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"]), invert);
     u8g2Fonts.setFont(u8g2_font_luRS08_tf);
     u8g2Fonts.setCursor(330, 297);
     u8g2Fonts.print("Moon Phase");
@@ -899,45 +920,42 @@ void weatherPrint()
 
     if (s == "01d")
     { // Clear Day
-      iconSun(display, 361, 189, 15);
-      // iconSleet(x,y,r);//iconHail(x,y,r);//same
-      // iconWind(x,y,r);
-      // iconTornado(x,y,r);
+      iconSun(display, 361, 189, 15, invert);
     }
     else if (s == "01n") // Clear Night
-      iconMoon(display, 361, 189, 15);
+      iconMoon(display, 361, 189, 15, invert);
     else if (s == "02d") // few clouds
-      iconCloudyDay(display, 330, 160, 60);
+      iconCloudyDay(display, 330, 160, 60, invert);
     else if (s == "02n")
-      iconCloudyNight(display, 330, 160, 60);
+      iconCloudyNight(display, 330, 160, 60, invert);
     else if (s == "03d") // scattered clouds
-      iconCloud(display, 361, 189, 15);
+      iconCloud(display, 361, 189, 15, invert);
     else if (s == "03n")
-      iconCloud(display, 361, 189, 15);
+      iconCloud(display, 361, 189, 15, invert);
     else if (s == "04d") // broken clouds (two clouds)
-      iconCloudy(display, 330, 160, 60);
+      iconCloudy(display, 330, 160, 60, invert);
     else if (s == "04n")
-      iconCloudy(display, 330, 160, 60);
+      iconCloudy(display, 330, 160, 60, invert);
     else if (s == "09d") // shower rain
-      iconSleet(display, 330, 160, 60);
+      iconSleet(display, 330, 160, 60, invert);
     else if (s == "09n")
-      iconSleet(display, 330, 160, 60);
+      iconSleet(display, 330, 160, 60, invert);
     else if (s == "10d") // snow
-      iconRain(display, 330, 160, 60);
+      iconRain(display, 330, 160, 60, invert);
     else if (s == "10n")
-      iconRain(display, 330, 160, 60);
+      iconRain(display, 330, 160, 60, invert);
     else if (s == "11d") // thunderstorm
-      iconThunderstorm(display, 330, 160, 60);
+      iconThunderstorm(display, 330, 160, 60, invert);
     else if (s == "11n")
-      iconThunderstorm(display, 330, 160, 60);
+      iconThunderstorm(display, 330, 160, 60, invert);
     else if (s == "13d") // snow
-      iconSnow(display, 330, 160, 60);
+      iconSnow(display, 330, 160, 60, invert);
     else if (s == "13n")
-      iconSnow(display, 330, 160, 60);
+      iconSnow(display, 330, 160, 60, invert);
     else if (s == "50d") // mist
-      iconFog(display, 330, 160, 60);
+      iconFog(display, 330, 160, 60, invert);
     else if (s == "50n")
-      iconFog(display, 330, 160, 60);
+      iconFog(display, 330, 160, 60, invert);
 
     u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
     s = JSON.stringify(myObject["current"]["weather"][0]["main"]);
@@ -964,9 +982,6 @@ void weatherPrint()
       u8g2Fonts.print(s);
     }
   }
-
-  // Turn off WiFi as soon as possible after data fetch
-  turnOffWifi();
 }
 
 // UNCOMMENT BELOW FUNCTION AND REMOVE THE ABOVE FUNCTION WITH THE SAME NAME IF YOU WISH TO USE ONLY oPENwEATHERmAP API
@@ -1186,12 +1201,12 @@ void networkInfo()
 }
 
 // Checks for wifi signal level and prints one of the two icons accordingly. High and Avg.
-void wifiStatus()
+void wifiStatus(bool invert)
 {
   if (WiFi.RSSI() >= -60)
-    display.drawBitmap(270, 0, wifiOn, 12, 12, GxEPD_BLACK);
+    display.drawBitmap(270, 0, wifiOn, 12, 12, invert ? GxEPD_WHITE : GxEPD_BLACK);
   else
-    display.drawBitmap(270, 0, wifiAvg, 12, 12, GxEPD_BLACK);
+    display.drawBitmap(270, 0, wifiAvg, 12, 12, invert ? GxEPD_WHITE : GxEPD_BLACK);
 }
 
 // Prints Alert icon and the passed message all over the screen. Implement a infinite while loop after calling this function
