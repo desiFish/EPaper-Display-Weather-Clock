@@ -188,29 +188,74 @@
 
 <table style="border-spacing: 10px; border-collapse: separate;">
   <tr>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd2.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd3.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd.jpg" alt="Clock Normal Mode" width="300"/>
+      <p align="center"><i>Clock Normal Mode</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd2.jpg" alt="Clock Power Conserved Mode" width="300"/>
+      <p align="center"><i>Clock Power Conserved Mode</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd3.jpg" alt="Side View 1" width="300"/>
+      <p align="center"><i>Side View 1</i></p>
+    </td>
   </tr>
   <tr>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd4.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd5.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd6.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd4.jpg" alt="Back View" width="300"/>
+      <p align="center"><i>Back View</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd5.jpg" alt="Side View 2" width="300"/>
+      <p align="center"><i>Side View 2</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd6.jpg" alt="Top View" width="300"/>
+      <p align="center"><i>Top View</i></p>
+    </td>
   </tr>
   <tr>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd7.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd8.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd9.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd7.jpg" alt="ESP32 Compared" width="300"/>
+      <p align="center"><i>ESP32 Compared</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd8.jpg" alt="Testing" width="300"/>
+      <p align="center"><i>Testing</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd9.jpg" alt="Integration" width="300"/>
+      <p align="center"><i>Integration</i></p>
+    </td>
   </tr>
   <tr>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd10.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd11.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd12.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd10.jpg" alt="Mainboard Front" width="300"/>
+      <p align="center"><i>Mainboard Front</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd11.jpg" alt="Internal 1" width="300"/>
+      <p align="center"><i>Internal 1</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd12.jpg" alt="Internal 2" width="300"/>
+      <p align="center"><i>Internal 2</i></p>
+    </td>
   </tr>
   <tr>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd13.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd14.jpg" alt="Clock" width="300"/></td>
-    <td width="33%" style="padding: 0;"><img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd15.jpg" alt="Clock" width="300"/></td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd13.jpg" alt="Facelift Clock" width="300"/>
+      <p align="center"><i>Facelift Clock</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd14.jpg" alt="LiFePO4 Cell 4000mAh" width="300"/>
+      <p align="center"><i>LiFePO4 Cell 4000mAh</i></p>
+    </td>
+    <td width="33%" style="padding: 0;">
+      <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd15.jpg" alt="Mainboard Back" width="300"/>
+      <p align="center"><i>Mainboard Back</i></p>
+    </td>
   </tr>
 </table>
 
