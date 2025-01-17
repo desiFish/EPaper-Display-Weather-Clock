@@ -44,6 +44,7 @@ Copyright (C) 2024 desiFish
 #include <ESPAsyncWebServer.h> // for web server
 #include <AsyncTCP.h>          // for tcp connection
 #include <Preferences.h>       // for storing data in flash memory
+#include <esp_wifi.h>          // Add this with other includes at the top
 
 //=============== GLOBAL OBJECTS =================
 Preferences pref;
@@ -229,17 +230,29 @@ U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;                                                
 #define BATPIN A0    // Battery voltage divider pin (1M Ohm with 104 Capacitor)
 #define DEBUG_PIN D6 // Debug mode toggle pin
 
-// Battery monitoring settings
-#define BATTERY_LEVEL_SAMPLING 4 // Number of samples to average
-#define battType 3.6             // Battery type voltage (ICR: 4.2, LFR: 3.6)
-#define battChangeThreshold 0.15 // Threshold for battery level changes
-#define battUpperLim 3.3         // Upper voltage limit
-#define battHigh 3.4             // Ideal battery voltage threshold (ICR: 4.1, LFR: 3.4)
-#define battLow 2.9              // Low battery threshold
+/**
+ * @brief Battery level sampling parameters
+ * BATTERY_LEVEL_SAMPLING: Number of samples to average for battery reading
+ * battType: Battery nominal voltage (ICR: 4.2V, LFP: 3.6V)
+ * battChangeThreshold: Minimum voltage change to update battery level
+ * battUpperLim: Maximum expected battery voltage
+ * battHigh: Healthy battery threshold voltage
+ * battLow: Low battery warning threshold
+ */
+#define BATTERY_LEVEL_SAMPLING 4
+#define battType 3.6
+#define battChangeThreshold 0.15
+#define battUpperLim 3.3
+#define battHigh 3.4
+#define battLow 2.9
 
-// Sleep settings
-#define uS_TO_S_FACTOR 1000000 // Micro seconds to seconds conversion
-int TIME_TO_SLEEP = 900;       // Default sleep time in seconds (15 mins)
+/**
+ * @brief Sleep configuration
+ * uS_TO_S_FACTOR: Microseconds to seconds conversion
+ * TIME_TO_SLEEP: Sleep duration in seconds (default 15 mins)
+ */
+#define uS_TO_S_FACTOR 1000000
+int TIME_TO_SLEEP = 900;
 
 //=============== GLOBAL VARIABLES ===============
 // State variables
@@ -264,7 +277,12 @@ const char OPEN_WEATHER_PARAMS[] = "&exclude=hourly,minutely&units=metric&appid=
 const char CUSTOM_WEATHER_BASE_URL[] = "http://iotthings.pythonanywhere.com/api/weatherStation/serve?api_key=";
 
 //=============== HELPER FUNCTIONS ===============
-// Measures and returns the averaged battery voltage
+
+/**
+ * @brief Measures battery voltage with averaging
+ * @return float Averaged battery voltage in volts
+ * @note Uses voltage divider with 1MΩ resistor and 104 capacitor
+ */
 float batteryLevel()
 {
   uint32_t Vbatt = 0;
@@ -278,14 +296,29 @@ float batteryLevel()
   return (Vbattf);
 }
 
-// Disables WiFi and reduces CPU frequency to save power
+/**
+ * @brief Disables WiFi and enters power saving mode
+ * @note Reduces CPU frequency and disables unused peripherals
+ */
 void turnOffWifi()
 {
-  WiFi.disconnect(true);  // Disconnect from the network
-  WiFi.mode(WIFI_OFF);    // Switch WiFi off
-  setCpuFrequencyMhz(40); // Set CPU to 40MHz
+  // Disable WiFi
+  WiFi.disconnect(true); // Disconnect and clear credentials
+  WiFi.mode(WIFI_OFF);   // Set WiFi mode to off
+  esp_wifi_stop();
+
+  // Additional power savings
+  btStop(); // Disable Bluetooth - more compatible than esp_bt_controller_disable()
+
+  // Reduce CPU frequency last
+  if (getCpuFrequencyMhz() != 20)
+  {
+    setCpuFrequencyMhz(20); // Set CPU to 20MHz
+  }
+
   delay(1);
-  Serial.println("WIFI OFF");
+  Serial.println("Power saving mode enabled");
+  Serial.println(getCpuFrequencyMhz());
 }
 
 // forward declaration
@@ -295,12 +328,23 @@ void weatherPrint(bool invert = false);
 //=============== MAIN SETUP AND LOOP ===============
 void setup()
 {
-  setCpuFrequencyMhz(80); // Set CPU to 80MHz
   Serial.begin(115200);
   Serial.println("Setup");
+  if (getCpuFrequencyMhz() != 20)
+    setCpuFrequencyMhz(20); // Set CPU to 20MHz
+  Serial.println(getCpuFrequencyMhz());
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
-  ++bootCount;                     // increment the boot count
+  pref.begin("database", false);
+  BATTERY_CRITICAL = pref.isKey("battCrit");
+  if (!BATTERY_CRITICAL)
+    pref.putBool("battCrit", false);
+  BATTERY_CRITICAL = pref.getBool("battCrit", false);
+  bool tempBATTERY_CRITICAL = BATTERY_CRITICAL;
+
+  if (BATTERY_CRITICAL)
+    turnOffWifi(); // wifioff cpu speed reduced to save power
+
   if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
     DEBUG_MODE = true;
   Wire.begin();                         // Start the I2C communication
@@ -309,13 +353,6 @@ void setup()
   display.init(115200, true, 2, false); // USE THIS for Waveshare boards with "clever" reset circuit, 2ms reset pulse
 
   u8g2Fonts.begin(display); // connect u8g2 procedures to Adafruit GFX
-
-  pref.begin("database", false);
-  BATTERY_CRITICAL = pref.isKey("battCrit");
-  if (!BATTERY_CRITICAL)
-    pref.putBool("battCrit", false);
-  BATTERY_CRITICAL = pref.getBool("battCrit", false);
-  bool tempBATTERY_CRITICAL = BATTERY_CRITICAL;
 
   bool checkFlag = pref.isKey("nightFlag");
   if (!checkFlag)
@@ -345,7 +382,9 @@ void setup()
   Serial.print(lux);
   Serial.println(" lx");
 
-  if (!BATTERY_CRITICAL && lux != 0)
+  float hTempHold, lTempHold, tempBattLevel;
+
+  if ((!BATTERY_CRITICAL && lux != 0) || DEBUG_MODE == true)
   {
     // if battery is critical, then no need to check wifi and weather api
     bool wifiConfigExist = pref.isKey("ssid");
@@ -360,6 +399,7 @@ void setup()
 
     if (ssid == "" || password == "")
     {
+      setCpuFrequencyMhz(80); // Set CPU to 80MHz for wifi manager
       // if no ssid or password saved, then start the wifi manager
       Serial.println("No values saved for ssid or password");
       // Connect to Wi-Fi network with SSID and password
@@ -409,12 +449,7 @@ void setup()
       while (true)
         ;
     }
-  }
 
-  float hTempHold, lTempHold, tempBattLevel;
-
-  if (lux != 0 || DEBUG_MODE == true)
-  {
     // if lux is 0, then the device is in dark mode and no need to initialize sensors
     if (!rtc.begin())
     {
@@ -465,6 +500,8 @@ void setup()
     if (!BATTERY_CRITICAL)
     {
       // Connect to Wi-Fi network with SSID and password if battery is not critical
+      setCpuFrequencyMhz(80); // Set CPU to 80MHz for wifi
+      delay(10);
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid.c_str(), password.c_str());
       while (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -489,8 +526,6 @@ void setup()
 
       customApiKey = pref.getString("apiCustom", "");
     }
-    else
-      turnOffWifi(); // wifioff cpu speed reduced to save power
 
     hTemp = pref.getFloat("hTemp", -1.0);
     lTemp = pref.getFloat("lTemp", -1.0);
@@ -505,6 +540,7 @@ void setup()
 
     hTempHold = hTemp, lTempHold = lTemp, tempBattLevel = battLevel;
   }
+
   bool tempNightFlag = nightFlag;
 
   Serial.println("Setup done");
@@ -543,6 +579,7 @@ void setup()
       {
         if (WiFi.status() == WL_CONNECTED)
         {
+          ++bootCount; // increment the boot counter
           Serial.println("Time And Weather");
           if (bootCount == ghostProtek)
           {
@@ -556,6 +593,8 @@ void setup()
             tempPrint();    // prints temperature and battery level
             weatherPrint(); // prints weather data
           }
+          if (bootCount == ghostProtek)
+            bootCount = 0;
           Serial.println("Time And Weather Done");
         }
         else
@@ -575,7 +614,7 @@ void setup()
     Serial.println("Data Write");
 
     if (lux != 0)
-    { // if lux is 0, then the device is in dark mode and no need to save data
+    { // if lux is 0, then the device is in sleep mode and no need to save data
       if (hTempHold != hTemp)
         pref.putFloat("hTemp", hTemp);
       if (lTempHold != lTemp)
@@ -587,9 +626,6 @@ void setup()
     }
     if (tempNightFlag != nightFlag) // if night mode changes, then save the new state
       pref.putBool("nightFlag", nightFlag);
-
-    if (bootCount == ghostProtek)
-      bootCount = 0;
 
     Serial.println("Data Write Done");
     pref.end(); // Close the preferences
@@ -611,7 +647,12 @@ void loop()
 }
 
 //=============== WEATHER AND DISPLAY FUNCTIONS ===============
-// Fetches weather data from API and returns JSON response
+
+/**
+ * @brief Fetches weather data from API endpoint
+ * @param serverName URL of the weather API endpoint
+ * @return String JSON response from server
+ */
 String weatherDataAPI(const char *serverName)
 {
   WiFiClient client;
@@ -642,8 +683,11 @@ String weatherDataAPI(const char *serverName)
   return payload;
 }
 
-// Prints weather data on the display
-// offset is used to shift the temperature display to the middle when wifi is off
+/**
+ * @brief Prints temperature and environmental data
+ * @param offset Vertical offset for display positioning (default: 0)
+ * @param invert Inverts colors for ghost protection (default: false)
+ */
 void tempPrint(byte offset, bool invert)
 {
   // Configure fonts and colors once at the start
@@ -677,7 +721,7 @@ void tempPrint(byte offset, bool invert)
   u8g2Fonts.print("V");
 
   int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
-  BATTERY_CRITICAL = percent < 1;
+  BATTERY_CRITICAL = percent < 3;
 
   u8g2Fonts.setCursor(63, 11);
   if (!BATTERY_CRITICAL)
@@ -768,8 +812,11 @@ void tempPrint(byte offset, bool invert)
   }
 }
 
-// works only if wifi is connected. Prints data from openweather api and custom weather station.
-// Use the other function with same name (COMMENTED) if you wish to use only OpenWeatherMap
+/**
+ * @brief Fetches and displays weather data
+ * @param invert Inverts display colors for ghost protection
+ * @note Requires active WiFi connection and valid API keys
+ */
 void weatherPrint(bool invert)
 {
   uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
@@ -1169,7 +1216,11 @@ void weatherPrint()
 }*/
 
 //=============== UI HELPER FUNCTIONS ===============
-// In case of api failure, it displays network info for debugging
+
+/**
+ * @brief Displays network debugging information
+ * @note Shows WiFi status, signal strength, and HTTP response codes
+ */
 void networkInfo()
 {
   display.drawBitmap(270, 0, wifiError, 13, 13, GxEPD_BLACK);
@@ -1200,7 +1251,10 @@ void networkInfo()
     u8g2Fonts.print(" Poor");
 }
 
-// Checks for wifi signal level and prints one of the two icons accordingly. High and Avg.
+/**
+ * @brief Displays WiFi signal strength indicator
+ * @param invert Inverts icon colors for ghost protection
+ */
 void wifiStatus(bool invert)
 {
   if (WiFi.RSSI() >= -60)
@@ -1209,7 +1263,9 @@ void wifiStatus(bool invert)
     display.drawBitmap(270, 0, wifiAvg, 12, 12, invert ? GxEPD_WHITE : GxEPD_BLACK);
 }
 
-// Prints Alert icon and the passed message all over the screen. Implement a infinite while loop after calling this function
+/**
+ * @brief Prints Alert icon and the passed message all over the screen. Implement a infinite while loop after calling this function
+ */
 void errMsg(String msg)
 {
   display.setRotation(0);
@@ -1232,7 +1288,9 @@ void errMsg(String msg)
   } while (display.nextPage());
 }
 
-// prints debug related msgs
+/**
+ * @brief Prints debug related msgs
+ */
 void debugPrinter(String msg)
 {
   display.setRotation(0);

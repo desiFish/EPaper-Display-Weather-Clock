@@ -70,16 +70,16 @@
 <td width="50%" align="center">
   
 ### 🆕 Latest Version
-[**v0.2.1-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.1-beta)
-- 🚀 Power and Memory Efficiency improvements 
-- 👻 Screen Ghosting protection added (Experimental)
+[**v0.2.2-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.2-beta)
+- 🚀 Power Efficiency improvements 
+- 📝 Documentation improvements
   
 </td>
 <td width="50%" align="center">
 
 ### 🎯 Coming Soon
 - 📱 Web browser integration
-- 🌐 Enhanced weather data
+- 🌐 Enhanced weather data graph
 - 🎨 New display layouts
   
 </td>
@@ -102,6 +102,32 @@
 • 🔄 Auto WiFi Configuration  
 • ⏰ Power-efficient Sleep Modes  
 • 📊 Environmental Monitoring
+
+## ⚡ Power Performance
+
+<div align="center">
+  
+### 🔋 Power Optimization Results
+![Optimization](https://img.shields.io/badge/Power-Optimized-success?style=for-the-badge)
+![CPU](https://img.shields.io/badge/CPU-Monitored-blue?style=for-the-badge)
+![Efficiency](https://img.shields.io/badge/Efficiency-Enhanced-green?style=for-the-badge)
+
+</div>
+
+> 📊 **Performance Metrics**
+> 
+> After recent code optimizations, power efficiency has significantly improved:
+> 
+> | Mode | Duration | Status |
+> |------|----------|---------|
+> | Normal Active Mode | ~22s | ![Status](https://img.shields.io/badge/22s-Normal-blue) |
+> | Sleep Transition | ~20s | ![Status](https://img.shields.io/badge/20s-Expected-green) |
+> | Sleep-to-Sleep | <1s | ![Status](https://img.shields.io/badge/<1s-Optimal-success) |
+>
+> ✨ **Key Improvements**:
+> - CPU power thoroughly monitored and conserved
+> - Optimized mode transitions
+> - Minimal wake time in sleep cycles
 
 ## 📊 Battery Performance
 
