@@ -50,7 +50,7 @@
       • TMP117 (Temperature)<br>
       • BH1750 (Light sensing)<br>
       • DS3231 (Time keeping)<br>
-      • BMP680 (Humidity & pressure)
+      • BME680 (Humidity & pressure)
     </td>
   </tr>
   <tr>
