@@ -70,9 +70,9 @@
 <td width="50%" align="center">
   
 ### 🆕 Latest Version
-[**v0.2.2-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.2-beta)
-- 🚀 Power Efficiency improvements 
-- 📝 Documentation improvements
+[**v0.2.3-beta**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.2.2-beta)
+- 🚀 Smart Auto Time Update Added 
+- 📝 Other improvements and bug fixes
   
 </td>
 <td width="50%" align="center">

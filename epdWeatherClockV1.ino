@@ -31,8 +31,10 @@ Copyright (C) 2024 desiFish
 #include <SparkFun_TMP117.h>       // TMP117 temperature sensor library
 #include <Adafruit_Sensor.h>       // Adafruit sensor library
 #include "Adafruit_BME680.h"       // BME680 environmental sensor library
-#include "RTClib.h"                // RTC library
-#include "image.h"                 //for sleep icon
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include "RTClib.h" // RTC library
+#include "image.h"  //for sleep icon
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Arduino_JSON.h>
@@ -201,9 +203,12 @@ const char *PARAM_INPUT_2 = "pass";
 String ssid;
 String password;
 
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "asia.pool.ntp.org", 19800); // 19800 is offset of India, asia.pool.ntp.org is close to India
+
 // save number of boots
-RTC_DATA_ATTR int bootCount = 0;
-const byte ghostProtek = 2; // ghost protection, 2 means for every 2 boots, 1 boot will be in dark mode
+RTC_DATA_ATTR int bootCount = 0; // Persistent boot counter stored in RTC memory
+const byte ghostProtek = 2;      // ghost protection, 2 means for every 2 boots, 1 boot will be in dark mode
 
 // openWeatherMap Api Key from your profile in account section
 String openWeatherMapApiKey = ""; // add your profile key here when running for the first time
@@ -335,9 +340,8 @@ void setup()
   Serial.println(getCpuFrequencyMhz());
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
-  pref.begin("database", false);
-  BATTERY_CRITICAL = pref.isKey("battCrit");
-  if (!BATTERY_CRITICAL)
+  pref.begin("database", false); // Open the preferences "database"
+  if (!pref.isKey("battCrit"))
     pref.putBool("battCrit", false);
   BATTERY_CRITICAL = pref.getBool("battCrit", false);
   bool tempBATTERY_CRITICAL = BATTERY_CRITICAL;
@@ -354,8 +358,7 @@ void setup()
 
   u8g2Fonts.begin(display); // connect u8g2 procedures to Adafruit GFX
 
-  bool checkFlag = pref.isKey("nightFlag");
-  if (!checkFlag)
+  if (!pref.isKey("nightFlag"))
   { // create key:value pair
     pref.putBool("nightFlag", false);
   }
@@ -372,7 +375,7 @@ void setup()
     while (1)
       ; // Runs forever
   }
-  float lux = 0;
+  float lux = 0; // Light level in lux
   while (!lightMeter.measurementReady(true))
   {
     yield(); // Wait for the measurement to be ready
@@ -382,13 +385,10 @@ void setup()
   Serial.print(lux);
   Serial.println(" lx");
 
-  float hTempHold, lTempHold, tempBattLevel;
-
+  // if battery is critical, then no need to check wifi and weather api
   if ((!BATTERY_CRITICAL && lux != 0) || DEBUG_MODE == true)
   {
-    // if battery is critical, then no need to check wifi and weather api
-    bool wifiConfigExist = pref.isKey("ssid");
-    if (!wifiConfigExist)
+    if (!pref.isKey("ssid"))
     { // create key:value pairs
       pref.putString("ssid", "");
       pref.putString("password", "");
@@ -449,8 +449,13 @@ void setup()
       while (true)
         ;
     }
+  }
 
-    // if lux is 0, then the device is in dark mode and no need to initialize sensors
+  float hTempHold, lTempHold, tempBattLevel;
+
+  // if lux is 0, then the device is in dark mode and no need to initialize sensors
+  if (lux != 0 || DEBUG_MODE == true)
+  {
     if (!rtc.begin())
     {
       Serial.println("Couldn't find RTC");
@@ -513,17 +518,29 @@ void setup()
       Serial.println("IP Address: ");
       Serial.println(WiFi.localIP());
 
-      // Check if the API keys are saved in the preferences
-      bool apiConfigExist = pref.isKey("api");
-      if (!apiConfigExist) // create key:value pairs
-        pref.putString("api", openWeatherMapApiKey);
+      // Get the current day
+      DateTime now = rtc.now();
+      byte currentDay = now.day();
 
+      // Check if we need to update time (once per day)
+      if (!pref.isKey("lastCheckedDay")) // create key:value pairs
+        pref.putUChar("lastCheckedDay", 0);
+      byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
+      if (lastCheckedDay != currentDay)
+      {
+        Serial.println("Updating time from NTP server");
+        autoTimeUpdate(); // Update time from NTP server
+        lastCheckedDay = currentDay;
+        pref.putUChar("lastCheckedDay", lastCheckedDay);
+      }
+
+      // Check if the API keys are saved in the preferences
+      if (!pref.isKey("api")) // create key:value pairs
+        pref.putString("api", openWeatherMapApiKey);
       openWeatherMapApiKey = pref.getString("api", "");
 
-      apiConfigExist = pref.isKey("apiCustom");
-      if (!apiConfigExist) // create key:value pairs
+      if (!pref.isKey("apiCustom")) // create key:value pairs
         pref.putString("apiCustom", customApiKey);
-
       customApiKey = pref.getString("apiCustom", "");
     }
 
@@ -823,7 +840,7 @@ void weatherPrint(bool invert)
   uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
   uint16_t red = invert ? GxEPD_WHITE : GxEPD_RED;
 
-  char serverPath[256];
+  char serverPath[256]; // Buffer for API URL
   strcpy(serverPath, OPEN_WEATHER_BASE_URL);
   strcat(serverPath, lat.c_str());
   strcat(serverPath, "&lon=");
@@ -1214,6 +1231,50 @@ void weatherPrint()
   // Turn off WiFi as soon as possible after data fetch
   turnOffWifi();
 }*/
+
+/**
+ * @brief Updates RTC time if 20 days have passed since last update
+ */
+void autoTimeUpdate()
+{
+  if (!pref.isKey("lastUpdateDay"))
+    pref.putUChar("lastUpdateDay", 0);
+
+  byte lastUpdateDay = pref.getUChar("lastUpdateDay", 0);
+  DateTime now = rtc.now();
+  byte currentDay = now.day();
+
+  // Calculate days passed, handling month rollover
+  int daysPassed = (currentDay - lastUpdateDay + 31) % 31; // Handle month rollover
+
+  // Check if 20 days have passed since last update
+  if (lastUpdateDay == 0 || daysPassed >= 20)
+  {
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      timeClient.begin();
+      if (timeClient.update() && timeClient.isTimeSet())
+      {
+        time_t rawtime = timeClient.getEpochTime();
+        struct tm *ti = localtime(&rawtime);
+
+        uint16_t year = ti->tm_year + 1900;
+        uint8_t month = ti->tm_mon + 1;
+        uint8_t day = ti->tm_mday;
+
+        rtc.adjust(DateTime(year, month, day,
+                            timeClient.getHours(),
+                            timeClient.getMinutes(),
+                            timeClient.getSeconds()));
+
+        // Update last update day
+        pref.putUChar("lastUpdateDay", currentDay);
+        Serial.println("RTC updated: " + String(year) + "-" +
+                       String(month) + "-" + String(day));
+      }
+    }
+  }
+}
 
 //=============== UI HELPER FUNCTIONS ===============
 
