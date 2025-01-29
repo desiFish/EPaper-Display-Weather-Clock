@@ -1,5 +1,5 @@
 /*
-epdWeatherStation.ino
+epdWeatherClockV1.ino
 Copyright (C) 2024 desiFish
 
   This program is free software: you can redistribute it and/or modify
@@ -46,7 +46,7 @@ Copyright (C) 2024 desiFish
 #include <ESPAsyncWebServer.h> // for web server
 #include <AsyncTCP.h>          // for tcp connection
 #include <Preferences.h>       // for storing data in flash memory
-#include <esp_wifi.h>          // Add this with other includes at the top
+#include <esp_wifi.h>          // for wifi functions
 
 //=============== GLOBAL OBJECTS =================
 Preferences pref;
@@ -257,7 +257,7 @@ U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;                                                
  * TIME_TO_SLEEP: Sleep duration in seconds (default 15 mins)
  */
 #define uS_TO_S_FACTOR 1000000
-int TIME_TO_SLEEP = 900;
+int TIME_TO_SLEEP = 900; // 15 minutes
 
 //=============== GLOBAL VARIABLES ===============
 // State variables
@@ -275,6 +275,10 @@ char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 int httpResponseCode; // for storing http response code
+
+// DEBUG_MODE update frequency
+unsigned long lastTime1 = 0;    // Last light sensor update
+const long timerDelay1 = 60000; // Light sensor update interval (60 seconds)
 
 // Define base URLs as const char arrays
 const char OPEN_WEATHER_BASE_URL[] = "http://api.openweathermap.org/data/3.0/onecall?lat=";
@@ -297,7 +301,7 @@ float batteryLevel()
     delay(10);
   }
   float Vbattf = 2 * Vbatt / BATTERY_LEVEL_SAMPLING / 1000.0; // attenuation ratio 1/2, mV --> V
-  // Serial.println(Vbattf);
+  // if (DEBUG_MODE) Serial.println(Vbattf);
   return (Vbattf);
 }
 
@@ -310,20 +314,80 @@ void turnOffWifi()
   // Disable WiFi
   WiFi.disconnect(true); // Disconnect and clear credentials
   WiFi.mode(WIFI_OFF);   // Set WiFi mode to off
-  esp_wifi_stop();
-
+  esp_wifi_stop();       // Stop WiFi
   // Additional power savings
   btStop(); // Disable Bluetooth - more compatible than esp_bt_controller_disable()
-
   // Reduce CPU frequency last
-  if (getCpuFrequencyMhz() != 20)
+  setCpuFrequencyMhz(20); // Set CPU to 20MHz
+  delay(5);               // wait for 5ms
+  if (DEBUG_MODE)
   {
-    setCpuFrequencyMhz(20); // Set CPU to 20MHz
+    Serial.println("Power saving mode enabled");
+    Serial.println(getCpuFrequencyMhz());
   }
+}
 
-  delay(1);
-  Serial.println("Power saving mode enabled");
-  Serial.println(getCpuFrequencyMhz());
+/**
+ * @brief Updates RTC time from NTP server if necessary
+ *
+ * This function checks if an update is needed based on the following criteria:
+ * 1. If it's the first run (lastUpdateDay is 0)
+ * 2. If 20 days have passed since the last update
+ * 3. If a force update is requested
+ *
+ * It handles month rollovers when calculating days passed.
+ * If an update is needed and WiFi is connected, it fetches the current time
+ * from an NTP server and updates the RTC.
+ *
+ * @param forceUpdate If true, bypasses the normal update interval check
+ * @return bool Returns true if the time was successfully updated, false otherwise
+ * @note Requires an active WiFi connection to function
+ * @note Uses Preferences to store the last update day
+ */
+bool autoTimeUpdate(bool forceUpdate = false)
+{
+  if (!pref.isKey("lastUpdateDay"))
+    pref.putUChar("lastUpdateDay", 0);
+
+  byte lastUpdateDay = pref.getUChar("lastUpdateDay", 0);
+  DateTime now = rtc.now();
+  byte currentDay = now.day();
+
+  // Calculate days passed, handling month rollover
+  int daysPassed = (currentDay - lastUpdateDay + 31) % 31; // Handle month rollover
+
+  // Check if 20 days have passed since last update
+  if (lastUpdateDay == 0 || daysPassed >= 20 || forceUpdate)
+  {
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      timeClient.begin();
+      if (timeClient.update() && timeClient.isTimeSet())
+      {
+        time_t rawtime = timeClient.getEpochTime();
+        struct tm *ti = localtime(&rawtime);
+
+        uint16_t year = ti->tm_year + 1900;
+        uint8_t month = ti->tm_mon + 1;
+        uint8_t day = ti->tm_mday;
+
+        rtc.adjust(DateTime(year, month, day,
+                            timeClient.getHours(),
+                            timeClient.getMinutes(),
+                            timeClient.getSeconds()));
+
+        // Update last update day
+        pref.putUChar("lastUpdateDay", currentDay);
+        if (DEBUG_MODE)
+        {
+          Serial.println("RTC updated: " + String(year) + "-" +
+                         String(month) + "-" + String(day));
+        }
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // forward declaration
@@ -331,15 +395,59 @@ void tempPrint(byte offset = 0, bool invert = false);
 void weatherPrint(bool invert = false);
 
 //=============== MAIN SETUP AND LOOP ===============
+
+/**
+ * @brief Initialize and configure all hardware and software components
+ *
+ * This function performs the following initializations:
+ * 1. CPU and Debug Configuration
+ *    - Sets CPU frequency to power-saving mode (20MHz)
+ *    - Initializes serial communication if in debug mode
+ *    - Configures debug pin and mode
+ *
+ * 2. Power Management
+ *    - Initializes battery monitoring
+ *    - Manages critical battery state
+ *    - Configures WiFi power state based on battery level
+ *
+ * 3. Hardware Initialization
+ *    - Configures I2C communication
+ *    - Initializes e-paper display
+ *    - Sets up environmental sensors (TMP117, BME680)
+ *    - Configures light sensor (BH1750)
+ *
+ * 4. State Management
+ *    - Handles night mode transitions
+ *    - Manages data persistence with preferences
+ *    - Updates high/low temperature records
+ *
+ * 5. Network Configuration
+ *    - Handles WiFi setup and connection
+ *    - Configures NTP time synchronization
+ *    - Sets up weather API access
+ *
+ * 6. Display Functions
+ *    - Updates screen based on current state
+ *    - Handles ghost protection display rotation
+ *    - Shows status information and sensor data
+ *
+ * @note Enters deep sleep mode after completion unless in debug mode
+ * @note Some features are disabled when battery is critical
+ */
 void setup()
 {
-  Serial.begin(115200);
-  Serial.println("Setup");
-  if (getCpuFrequencyMhz() != 20)
-    setCpuFrequencyMhz(20); // Set CPU to 20MHz
-  Serial.println(getCpuFrequencyMhz());
+  setCpuFrequencyMhz(20); // Set CPU to 20MHz
+  if (DEBUG_MODE)
+    Serial.begin(115200);
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
+  if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
+    DEBUG_MODE = true;
+  if (DEBUG_MODE)
+  {
+    Serial.println("Setup");
+    Serial.println(getCpuFrequencyMhz());
+  }
   pref.begin("database", false); // Open the preferences "database"
   if (!pref.isKey("battCrit"))
     pref.putBool("battCrit", false);
@@ -349,8 +457,6 @@ void setup()
   if (BATTERY_CRITICAL)
     turnOffWifi(); // wifioff cpu speed reduced to save power
 
-  if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
-    DEBUG_MODE = true;
   Wire.begin();                         // Start the I2C communication
   Wire.setClock(400000);                // Set clock speed to be the fastest for better communication (fast mode)
   analogReadResolution(12);             // Set ADC resolution to 12-bit
@@ -366,14 +472,16 @@ void setup()
 
   if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
   {
-    Serial.println(F("BH1750 Advanced begin"));
+    if (DEBUG_MODE)
+      Serial.println(F("BH1750 Advanced begin"));
   }
   else
   {
-    Serial.println(F("Error initialising BH1750"));
+    if (DEBUG_MODE)
+      Serial.println(F("Error initialising BH1750"));
     errMsg("Error BH1750");
     while (1)
-      ; // Runs forever
+      yield(); // Runs forever
   }
   float lux = 0; // Light level in lux
   while (!lightMeter.measurementReady(true))
@@ -381,9 +489,12 @@ void setup()
     yield(); // Wait for the measurement to be ready
   }
   lux = lightMeter.readLightLevel(); // Get Lux value from sensor
-  Serial.print("Light: ");
-  Serial.print(lux);
-  Serial.println(" lx");
+  if (DEBUG_MODE)
+  {
+    Serial.print("Light: ");
+    Serial.print(lux);
+    Serial.println(" lx");
+  }
 
   // if battery is critical, then no need to check wifi and weather api
   if ((!BATTERY_CRITICAL && lux != 0) || DEBUG_MODE == true)
@@ -401,15 +512,20 @@ void setup()
     {
       setCpuFrequencyMhz(80); // Set CPU to 80MHz for wifi manager
       // if no ssid or password saved, then start the wifi manager
-      Serial.println("No values saved for ssid or password");
+      if (DEBUG_MODE)
+        Serial.println("No values saved for ssid or password");
       // Connect to Wi-Fi network with SSID and password
-      Serial.println("Setting AP (Access Point)");
+      if (DEBUG_MODE)
+        Serial.println("Setting AP (Access Point)");
       // NULL sets an open Access Point
       WiFi.softAP("WCLOCK-WIFI-MANAGER", NULL);
 
       IPAddress IP = WiFi.softAPIP();
-      Serial.print("AP IP address: ");
-      Serial.println(IP);
+      if (DEBUG_MODE)
+      {
+        Serial.print("AP IP address: ");
+        Serial.println(IP);
+      }
 
       debugPrinter("Connect to 'WCLOCK-WIFI-MANAGER' \nfrom your phone or computer (Wifi).\n\nThen go to " + IP.toString() + "\nfrom your browser.");
 
@@ -426,20 +542,24 @@ void setup()
             // HTTP POST ssid value
             if (p->name() == PARAM_INPUT_1) {
               ssid = p->value();
-              Serial.print("SSID set to: ");
-              Serial.println(ssid);
+              if (DEBUG_MODE) {
+                Serial.print("SSID set to: ");
+                Serial.println(ssid);
+              }
               ssid.trim();
               pref.putString("ssid", ssid);
             }
             // HTTP POST pass value
             if (p->name() == PARAM_INPUT_2) {
               password = p->value();
-              Serial.print("Password set to: ");
-              Serial.println(password);
+              if (DEBUG_MODE) {
+                Serial.print("Password set to: ");
+                Serial.println(password);
+              }
               password.trim();
               pref.putString("password", password);
             }
-            //Serial.printf("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
+            //if (DEBUG_MODE) Serial.printf("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
           }
         }
         request->send(200, "text/html", "<h2>Done. Weather Station will now restart</h2>");
@@ -447,7 +567,7 @@ void setup()
         ESP.restart(); });
       server.begin();
       while (true)
-        ;
+        yield(); // Runs forever
     }
   }
 
@@ -458,13 +578,14 @@ void setup()
   {
     if (!rtc.begin())
     {
-      Serial.println("Couldn't find RTC");
+      if (DEBUG_MODE)
+        Serial.println("Couldn't find RTC");
       errMsg("Error RTC");
       while (1)
         ; // Runs forever
     }
-    Serial.println("RTC Ready");
-
+    if (DEBUG_MODE)
+      Serial.println("RTC Ready");
     DateTime now = rtc.now();
 
     if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
@@ -475,11 +596,13 @@ void setup()
 
     if (sensor.begin() == true) // Function to check if the TMP117 will correctly self-identify with the proper Device ID/Address
     {
-      Serial.println("TMP117 Begin");
+      if (DEBUG_MODE)
+        Serial.println("TMP117 Begin");
     }
     else
     {
-      Serial.println("Device failed to setup- Freezing code.");
+      if (DEBUG_MODE)
+        Serial.println("Device failed to setup- Freezing code.");
       errMsg("Error TMP117");
       while (1)
         ; // Runs forever
@@ -487,13 +610,15 @@ void setup()
 
     if (!bme.begin())
     {
-      Serial.println(F("Could not find a valid BME680 sensor, check wiring!"));
+      if (DEBUG_MODE)
+        Serial.println(F("Could not find a valid BME680 sensor, check wiring!"));
       errMsg("Error BME680");
       while (1)
         ; // Runs forever
     }
 
-    Serial.println("BME Ready");
+    if (DEBUG_MODE)
+      Serial.println("BME Ready");
 
     // Set up oversampling and filter initialization
     bme.setTemperatureOversampling(BME680_OS_2X);
@@ -511,28 +636,47 @@ void setup()
       WiFi.begin(ssid.c_str(), password.c_str());
       while (WiFi.waitForConnectResult() != WL_CONNECTED)
       {
-        Serial.println("Connection Failed");
+        if (DEBUG_MODE)
+          Serial.println("Connection Failed");
         break;
       }
 
-      Serial.println("IP Address: ");
-      Serial.println(WiFi.localIP());
+      if (DEBUG_MODE)
+      {
+        Serial.println("IP Address: ");
+        Serial.println(WiFi.localIP());
+      }
 
       // Get the current day
+      if (!pref.isKey("timeNeedsUpdate")) // create key:value pairs
+        pref.putBool("timeNeedsUpdate", true);
+      bool timeNeedsUpdate = pref.getBool("timeNeedsUpdate", false);
+
       DateTime now = rtc.now();
+      if ((now.year() == 1970) || rtc.lostPower())
+        timeNeedsUpdate = true;
       byte currentDay = now.day();
 
       // Check if we need to update time (once per day)
       if (!pref.isKey("lastCheckedDay")) // create key:value pairs
         pref.putUChar("lastCheckedDay", 0);
       byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
-      if (lastCheckedDay != currentDay)
+      if ((lastCheckedDay != currentDay) || timeNeedsUpdate)
       {
-        Serial.println("Updating time from NTP server");
-        autoTimeUpdate(); // Update time from NTP server
+        if (DEBUG_MODE)
+          Serial.println("Updating time from NTP server");
+        if (autoTimeUpdate(timeNeedsUpdate)) // Update time from NTP server
+          if (DEBUG_MODE)
+            Serial.println("Time Updated");
+          else if (DEBUG_MODE)
+            Serial.println("Time Not updated");
+        timeNeedsUpdate = false;
+        pref.putBool("timeNeedsUpdate", false);
         lastCheckedDay = currentDay;
         pref.putUChar("lastCheckedDay", lastCheckedDay);
       }
+      else if (DEBUG_MODE)
+        Serial.println("Time already updated");
 
       // Check if the API keys are saved in the preferences
       if (!pref.isKey("api")) // create key:value pairs
@@ -549,7 +693,8 @@ void setup()
     battLevel = pref.getFloat("battLevel", -1.0);
     if (hTemp == -1.0 || lTemp == -1.0 || battLevel == -1.0)
     {
-      Serial.println("No values saved for hTemp, lTemp or battLevel");
+      if (DEBUG_MODE)
+        Serial.println("No values saved for hTemp, lTemp or battLevel");
       pref.putFloat("hTemp", 0.0);
       pref.putFloat("lTemp", 60.0);
       pref.putFloat("battLevel", battType);
@@ -560,107 +705,135 @@ void setup()
 
   bool tempNightFlag = nightFlag;
 
-  Serial.println("Setup done");
-
   if (DEBUG_MODE)
+    Serial.println("Setup done");
+
+  if (lux == 0)
   {
-    errMsg("DEBUG MODE"); // Display debug message
-  }
-  else
-  {
-    if (lux == 0)
-    {
-      TIME_TO_SLEEP = 300; // 5 min wake period while darkness sleeping
-      if (nightFlag == 0)
-      { // prevents unnecessary redrawing of same thing
-        nightFlag = 1;
-        display.setRotation(0);
-        display.setFullWindow();
-        display.firstPage();
-        do
-        {
-          display.fillScreen(GxEPD_WHITE);
-          display.drawInvertedBitmap(0, 0, nightMode, 400, 300, GxEPD_BLACK);
-        } while (display.nextPage());
-      }
-      display.hibernate();
-      display.powerOff();
-    }
-    else
-    {
-      nightFlag = 0;
+    TIME_TO_SLEEP = 300; // 5 min wake period while darkness sleeping
+    if (nightFlag == 0)
+    { // prevents unnecessary redrawing of same thing
+      nightFlag = 1;
       display.setRotation(0);
       display.setFullWindow();
       display.firstPage();
       do
       {
-        if (WiFi.status() == WL_CONNECTED)
-        {
-          ++bootCount; // increment the boot counter
+        display.fillScreen(GxEPD_WHITE);
+        display.drawInvertedBitmap(0, 0, nightMode, 400, 300, GxEPD_BLACK);
+      } while (display.nextPage());
+    }
+    display.hibernate();
+    display.powerOff();
+  }
+  else
+  {
+    nightFlag = 0;
+    display.setRotation(0);
+    display.setFullWindow();
+    display.firstPage();
+    do
+    {
+      if (WiFi.status() == WL_CONNECTED)
+      {
+        ++bootCount; // increment the boot counter
+        if (DEBUG_MODE)
           Serial.println("Time And Weather");
-          if (bootCount == ghostProtek)
-          {
-            display.fillScreen(GxEPD_BLACK);
-            tempPrint(0, true); // prints temperature and battery level
-            weatherPrint(true); // prints weather data
-          }
-          else
-          {
-            display.fillScreen(GxEPD_WHITE);
-            tempPrint();    // prints temperature and battery level
-            weatherPrint(); // prints weather data
-          }
-          if (bootCount == ghostProtek)
-            bootCount = 0;
-          Serial.println("Time And Weather Done");
+        if (bootCount == ghostProtek)
+        {
+          display.fillScreen(GxEPD_BLACK);
+          tempPrint(0, true); // prints temperature and battery level
+          weatherPrint(true); // prints weather data
         }
         else
         {
           display.fillScreen(GxEPD_WHITE);
-          turnOffWifi(); // turn off wifi to save power when wifi is not connected
-          Serial.println("Time Only");
-          display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
-          tempPrint(40);                                            // offset for wifi off which shifts the temperature display to the middle
-          Serial.println("Time Done");
+          tempPrint();    // prints temperature and battery level
+          weatherPrint(); // prints weather data
         }
-      } while (display.nextPage());
-      display.hibernate();
-      display.powerOff();
-    }
+        if (bootCount == ghostProtek)
+          bootCount = 0;
+        if (DEBUG_MODE)
+          Serial.println("Time And Weather Done");
+      }
+      else
+      {
+        display.fillScreen(GxEPD_WHITE);
+        turnOffWifi(); // turn off wifi to save power when wifi is not connected
+        if (DEBUG_MODE)
+          Serial.println("Time Only");
+        display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
+        tempPrint(40);                                            // offset for wifi off which shifts the temperature display to the middle
+        if (DEBUG_MODE)
+          Serial.println("Time Done");
+      }
+    } while (display.nextPage());
+    display.hibernate();
+    display.powerOff();
+  }
 
+  if (DEBUG_MODE)
     Serial.println("Data Write");
 
-    if (lux != 0)
-    { // if lux is 0, then the device is in sleep mode and no need to save data
-      if (hTempHold != hTemp)
-        pref.putFloat("hTemp", hTemp);
-      if (lTempHold != lTemp)
-        pref.putFloat("lTemp", lTemp);
-      if (tempBattLevel != battLevel)
-        pref.putFloat("battLevel", battLevel);
-      if (tempBATTERY_CRITICAL != BATTERY_CRITICAL)
-        pref.putBool("battCrit", BATTERY_CRITICAL);
-    }
-    if (tempNightFlag != nightFlag) // if night mode changes, then save the new state
-      pref.putBool("nightFlag", nightFlag);
+  if (lux != 0)
+  { // if lux is 0, then the device is in sleep mode and no need to save data
+    if (hTempHold != hTemp)
+      pref.putFloat("hTemp", hTemp);
+    if (lTempHold != lTemp)
+      pref.putFloat("lTemp", lTemp);
+    if (tempBattLevel != battLevel)
+      pref.putFloat("battLevel", battLevel);
+    if (tempBATTERY_CRITICAL != BATTERY_CRITICAL)
+      pref.putBool("battCrit", BATTERY_CRITICAL);
+  }
+  if (tempNightFlag != nightFlag) // if night mode changes, then save the new state
+    pref.putBool("nightFlag", nightFlag);
 
+  pref.end(); // Close the preferences
+  Wire.end(); // End I2C communication
+
+  if (DEBUG_MODE)
+  {
     Serial.println("Data Write Done");
-    pref.end(); // Close the preferences
     Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
-
-    Wire.end();                                                    // End I2C communication
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
-    //  Go to sleep now
     Serial.println("Going to sleep now");
     Serial.flush(); // Flush the serial buffer
-    delay(5);       // Delay to ensure all the serial data is sent
-    // Enter deep sleep
+    delay(5);
+  }
+  // Enter deep sleep
+  if (!DEBUG_MODE) // if debug mode is off, then go to deep sleep
+  {
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
     esp_deep_sleep_start();
   }
 }
 
+/**
+ * @brief Main loop function that runs continuously in debug mode
+ *
+ * This function only executes when DEBUG_MODE is true. It provides
+ * continuous monitoring and debugging capabilities by:
+ * 1. Checking timing conditions every timerDelay1 interval
+ * 2. Displaying debug messages on the e-paper display
+ * 3. Allowing for interactive testing and monitoring
+ *
+ * Future debug functionality can be added within the timer check.
+ * The function uses non-blocking delays via millis() to maintain
+ * responsiveness.
+ *
+ * @note This loop is skipped during normal operation (DEBUG_MODE = false)
+ * @note Uses timerDelay1 (60s) to prevent excessive display updates
+ */
 void loop()
-{ // Empty loop function
+{
+  if ((millis() - lastTime1) > timerDelay1)
+  {
+    Serial.println("In LOOP");
+    errMsg("DEBUG MODE"); // Display debug message
+    // Additional debug functions can be added here
+    lastTime1 = millis();
+  }
+  yield();
 }
 
 //=============== WEATHER AND DISPLAY FUNCTIONS ===============
@@ -685,14 +858,20 @@ String weatherDataAPI(const char *serverName)
 
   if (httpResponseCode > 0)
   {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
+    if (DEBUG_MODE)
+    {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+    }
     payload = http.getString();
   }
   else
   {
-    Serial.print("Error code: ");
-    Serial.println(httpResponseCode);
+    if (DEBUG_MODE)
+    {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
   }
   // Free resources
   http.end();
@@ -795,7 +974,8 @@ void tempPrint(byte offset, bool invert)
   // Environmental readings
   if (!bme.beginReading() || !bme.endReading())
   {
-    Serial.println("BME READING ERROR");
+    if (DEBUG_MODE)
+      Serial.println("BME READING ERROR");
     return;
   }
 
@@ -851,13 +1031,15 @@ void weatherPrint(bool invert)
   jsonBuffer = weatherDataAPI(serverPath);
   if (httpResponseCode == -1 || httpResponseCode == -11)
     ESP.restart();
-  Serial.println(jsonBuffer);
+  if (DEBUG_MODE)
+    Serial.println(jsonBuffer);
   JSONVar myObject = JSON.parse(jsonBuffer);
 
   // JSON.typeof(jsonVar) can be used to get the type of the var
   if (JSON.typeof(myObject) == "undefined")
   {
-    Serial.println("Parsing input failed!");
+    if (DEBUG_MODE)
+      Serial.println("Parsing input failed!");
     ESP.restart();
     return;
   }
@@ -868,13 +1050,15 @@ void weatherPrint(bool invert)
   jsonBuffer = weatherDataAPI(serverPath);
   if (httpResponseCode == -1 || httpResponseCode == -11)
     ESP.restart();
-  Serial.println(jsonBuffer);
+  if (DEBUG_MODE)
+    Serial.println(jsonBuffer);
   JSONVar customObject = JSON.parse(jsonBuffer);
 
   // JSON.typeof(jsonVar) can be used to get the type of the var
   if (JSON.typeof(customObject) == "undefined")
   {
-    Serial.println("Parsing input failed!");
+    if (DEBUG_MODE)
+      Serial.println("Parsing input failed!");
     ESP.restart();
     return;
   }
@@ -1057,13 +1241,13 @@ void weatherPrint()
   jsonBuffer = weatherDataAPI(serverPath.c_str());
   if (httpResponseCode == -1 || httpResponseCode == -11)
     ESP.restart();
-  Serial.println(jsonBuffer);
+  if (DEBUG_MODE) Serial.println(jsonBuffer);
   JSONVar myObject = JSON.parse(jsonBuffer);
 
   // JSON.typeof(jsonVar) can be used to get the type of the var
   if (JSON.typeof(myObject) == "undefined")
   {
-    Serial.println("Parsing input failed!");
+    if (DEBUG_MODE) Serial.println("Parsing input failed!");
     ESP.restart();
     return;
   }
@@ -1231,50 +1415,6 @@ void weatherPrint()
   // Turn off WiFi as soon as possible after data fetch
   turnOffWifi();
 }*/
-
-/**
- * @brief Updates RTC time if 20 days have passed since last update
- */
-void autoTimeUpdate()
-{
-  if (!pref.isKey("lastUpdateDay"))
-    pref.putUChar("lastUpdateDay", 0);
-
-  byte lastUpdateDay = pref.getUChar("lastUpdateDay", 0);
-  DateTime now = rtc.now();
-  byte currentDay = now.day();
-
-  // Calculate days passed, handling month rollover
-  int daysPassed = (currentDay - lastUpdateDay + 31) % 31; // Handle month rollover
-
-  // Check if 20 days have passed since last update
-  if (lastUpdateDay == 0 || daysPassed >= 20)
-  {
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      timeClient.begin();
-      if (timeClient.update() && timeClient.isTimeSet())
-      {
-        time_t rawtime = timeClient.getEpochTime();
-        struct tm *ti = localtime(&rawtime);
-
-        uint16_t year = ti->tm_year + 1900;
-        uint8_t month = ti->tm_mon + 1;
-        uint8_t day = ti->tm_mday;
-
-        rtc.adjust(DateTime(year, month, day,
-                            timeClient.getHours(),
-                            timeClient.getMinutes(),
-                            timeClient.getSeconds()));
-
-        // Update last update day
-        pref.putUChar("lastUpdateDay", currentDay);
-        Serial.println("RTC updated: " + String(year) + "-" +
-                       String(month) + "-" + String(day));
-      }
-    }
-  }
-}
 
 //=============== UI HELPER FUNCTIONS ===============
 
