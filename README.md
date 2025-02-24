@@ -559,6 +559,12 @@ GNU General Public License v3.0
 - ❗ Must preserve copyright
 - ❗ Must use same license
 
+> 🙏 **Attribution Request**: If you use this code in your project, please include a link to this repository. Your support through attribution helps maintain and grow our open-source community. Thank you!
+>
+> ```markdown
+> Based on [ESP32 E-Paper Weather Clock](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock) by desiFish
+> ```
+
 </td>
 <td>
 

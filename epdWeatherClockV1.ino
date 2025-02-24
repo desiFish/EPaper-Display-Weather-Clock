@@ -420,7 +420,7 @@ void setup()
                 Serial.print("Password set to: ");
                 Serial.println(password);
               }
-              password.trim();
+              password.trim(); // remove leading and trailing spaces
               pref.putString("password", password);
             }
             //if (DEBUG_MODE) Serial.printf("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
