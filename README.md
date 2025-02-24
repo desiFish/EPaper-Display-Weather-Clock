@@ -282,14 +282,27 @@
   - 32-bit RISC-V single-core CPU up to 160MHz
   - 320KB SRAM, 4MB Flash
   - WiFi 6 & Bluetooth 5.0
-  - Ultra-low power consumption: ~15µA in deep sleep
+  - Ultra-low power consumption: ~14µA in deep sleep ([Source](https://sigmdel.ca/michel/ha/xiao/xiao_esp32c6_intro_en.html#deep_sleep))
     - Note: 14-15µA deep sleep current only achievable when power is supplied through battery pins (BAT+ and BAT-)
   - 11 Digital/Analog pins
   - USB-C interface
+  - ⚠️ May experience reduced WiFi range due to integrated PCB antenna
+    - Consider ESP32 C3 variant with external antenna for better signal strength
+    - Signal strength highly dependent on enclosure material and placement
+
+### Pin Differences Between C3 and C6
+<div align="center">
+<img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/epd18.png" width="600"><br>
+<table>
+</table>
+<p><i>Source: <a href="https://sigmdel.ca/michel/ha/xiao/xiao_esp32c6_intro_en.html#deep_sleep">sigmdel.ca</a></i></p>
+</div>
 
 ### Power Consumption Comparison
 - ⚡ **Deep Sleep Current**:
-  - XIAO ESP32 C6: ~15µA (Recommended for this project)
+  - XIAO ESP32 C6: ~20µA total
+    - 14.3µA from ESP32C6 core ([Source](https://sigmdel.ca/michel/ha/xiao/xiao_esp32c6_intro_en.html#deep_sleep))
+    - ~6µA from all peripheral devices (RTC, sensors, etc.)
   - XIAO ESP32 C3: Higher deep sleep current
   - XIAO ESP32 S3: Potentially lower deep sleep current (untested)
     - Not used due to project's modest performance needs
@@ -334,11 +347,16 @@
 - 🔋 IFR26700 LiFePO4 Battery
   - Nominal voltage: 3.2V
   - Capacity: 4000mAh (8000mAh total with 2 cells)
-  - Cycle life: >2000 cycles
+  - Cycle life: >1000 min. cycles
   - Size: 26mm × 70mm
   - Max discharge current: 8A
   - Operating temperature: -20°C to +60°C
   - Self-discharge rate: <3% monthly
+  - Battery critical threshold: 30%
+    - Higher threshold significantly increases battery lifecycle ([Source](https://batteries.intercel.eu/knowledge-center/battery-technology/lithium-batteries/lifepo4-batteries/#:~:text=LiFePO4%20batteries%20last%20more%20than,continue%20where%20other%20batteries%20stop.))
+    - Urges to recharge at 30% remaining capacity
+    - Preserves cell health for longer service life
+    - Implemented in firmware via critBattPercent constant
 
 - ⚡ TP5000 Charging Module
   - Input voltage: 4.5-8V

@@ -19,6 +19,7 @@ Copyright (C) 2024 desiFish
 
 // E-paper weather clock v1 - Main code
 // Uses GxEPD2 library for e-paper display control
+// Using Huge App partition (3MB NO OTA/1MB SPIFFS)
 
 //=============== CONFIGURATION ===============
 // Enable/disable GxEPD2_GFX base class - uses ~1.2k more code
@@ -53,15 +54,6 @@ Preferences pref;
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-//=============== HTML CODE =================
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE html><html><head><title>WiFi Setup</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial;text-align:center;margin:20px}input{margin:10px;padding:5px}form{background:#f0f0f0;padding:20px;display:inline-block}</style></head><body><h1>Weather Station Setup</h1><form action="/" method="POST"><label for="ssid">SSID</label><br><input type="text" id="ssid" name="ssid"><br><label for="pass">Password</label><br><input type="text" id="pass" name="pass"><br><input type="submit" value="Connect"></form></body></html>
-)rawliteral";
-
-// Search for parameter in HTTP POST request
-const char *PARAM_INPUT_1 = "ssid";
-const char *PARAM_INPUT_2 = "pass";
-
 // your wifi name and password
 String ssid;
 String password;
@@ -71,7 +63,7 @@ NTPClient timeClient(ntpUDP, "asia.pool.ntp.org", 19800); // 19800 is offset of 
 
 // save number of boots
 RTC_DATA_ATTR int bootCount = 0; // Persistent boot counter stored in RTC memory
-const byte ghostProtek = 2;      // ghost protection, 2 means for every 2 boots, 1 boot will be in dark mode
+const byte ghostProtek = 5;      // ghost protection, 5 means for every 5 boots, 1 boot will be in dark mode
 
 // openWeatherMap Api Key from your profile in account section
 String openWeatherMapApiKey = ""; // add your profile key here when running for the first time
@@ -89,30 +81,32 @@ TMP117 sensor;           // Initalize temperature sensor
 Adafruit_BME680 bme;     // Initalize environmental sensor
 BH1750 lightMeter(0x23); // Initalize light sensor
 
-// Initalize display
-GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS=5*/ /* SS*/ D7, /*DC=*/D1, /*RST=*/D2, /*BUSY=*/D3)); // 400x300, UC8276
-U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;                                                                                                       // u8g2 fonts
-
-//=============== GLOBAL CONSTANTS ===============
-// Hardware pins
+// Initalize display for 400x300, UC8276
+GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS=5*/ /* SS*/ D7, /*DC=*/D1, /*RST=*/D2, /*BUSY=*/D3));
 #define BATPIN A0    // Battery voltage divider pin (1M Ohm with 104 Capacitor)
 #define DEBUG_PIN D6 // Debug mode toggle pin
 
-/**
- * @brief Battery level sampling parameters
- * BATTERY_LEVEL_SAMPLING: Number of samples to average for battery reading
- * battType: Battery nominal voltage (ICR: 4.2V, LFP: 3.6V)
- * battChangeThreshold: Minimum voltage change to update battery level
- * battUpperLim: Maximum expected battery voltage
- * battHigh: Healthy battery threshold voltage
- * battLow: Low battery warning threshold
- */
-#define BATTERY_LEVEL_SAMPLING 4
-#define battType 3.6
-#define battChangeThreshold 0.15
-#define battUpperLim 3.3
-#define battHigh 3.4
-#define battLow 2.9
+/*
+GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(20, 3, 4, 5)); //for XIAO_ESP32C3 in case the above declaration gives error
+#define BATPIN 2      // Battery voltage divider pin (1M Ohm with 104 Capacitor)
+#define DEBUG_PIN 21  // Debug mode toggle pin
+*/
+/*
+GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(17, 1, 2, 21)); //for XIAO_ESP32C6
+#define BATPIN 0      // Battery voltage divider pin (1M Ohm with 104 Capacitor)
+#define DEBUG_PIN 16  // Debug mode toggle pin
+*/
+
+U8G2_FOR_ADAFRUIT_GFX u8g2Fonts; // u8g2 fonts
+
+//=============== GLOBAL CONSTANTS ===============
+#define BATTERY_LEVEL_SAMPLING 4 // BATTERY_LEVEL_SAMPLING: Number of samples to average for battery reading
+#define battType 3.6             // battType: Battery nominal voltage (ICR: 4.2V, LFP: 3.6V) (Change accordingly)
+#define battChangeThreshold 0.15 // battChangeThreshold: Minimum voltage change to update battery level
+#define battUpperLim 3.3         // battUpperLim: Maximum expected battery voltage (Change accordingly)
+#define battHigh 3.4             // battHigh: Healthy battery threshold voltage (Change accordingly)
+#define battLow 2.9              // battLow: Low battery warning threshold (Change accordingly)
+#define critBattPercent 30       // critBattPercent: Critical battery percentage threshold
 
 /**
  * @brief Sleep configuration
@@ -147,6 +141,15 @@ const long timerDelay1 = 60000; // Light sensor update interval (60 seconds)
 const char OPEN_WEATHER_BASE_URL[] = "http://api.openweathermap.org/data/3.0/onecall?lat=";
 const char OPEN_WEATHER_PARAMS[] = "&exclude=hourly,minutely&units=metric&appid=";
 const char CUSTOM_WEATHER_BASE_URL[] = "http://iotthings.pythonanywhere.com/api/weatherStation/serve?api_key=";
+
+//=============== HTML CODE =================
+const char index_html[] PROGMEM = R"rawliteral(
+ <!DOCTYPE html><html><head><title>WiFi Setup</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:Arial;text-align:center;margin:20px}input{margin:10px;padding:5px}form{background:#f0f0f0;padding:20px;display:inline-block}</style></head><body><h1>Weather Station Setup</h1><form action="/" method="POST"><label for="ssid">SSID</label><br><input type="text" id="ssid" name="ssid"><br><label for="pass">Password</label><br><input type="text" id="pass" name="pass"><br><input type="submit" value="Connect"></form></body></html>
+ )rawliteral";
+
+// Search for parameter in HTTP POST request
+const char *PARAM_INPUT_1 = "ssid";
+const char *PARAM_INPUT_2 = "pass";
 
 //=============== HELPER FUNCTIONS ===============
 
@@ -243,8 +246,7 @@ bool autoTimeUpdate(bool forceUpdate = false)
         pref.putUChar("lastUpdateDay", currentDay);
         if (DEBUG_MODE)
         {
-          Serial.println("RTC updated: " + String(year) + "-" +
-                         String(month) + "-" + String(day));
+          Serial.println("RTC updated: " + String(year) + "-" + String(month) + "-" + String(day));
         }
         return true;
       }
@@ -300,8 +302,14 @@ void weatherPrint(bool invert = false);
 void setup()
 {
   setCpuFrequencyMhz(20); // Set CPU to 20MHz
+  pinMode(LED_BUILTIN, OUTPUT);
+
   if (DEBUG_MODE)
+  {
     Serial.begin(115200);
+    digitalWrite(LED_BUILTIN, HIGH);
+  }
+
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
   if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
@@ -780,7 +788,7 @@ void tempPrint(byte offset, bool invert)
   u8g2Fonts.print("V");
 
   int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
-  BATTERY_CRITICAL = percent < 3;
+  BATTERY_CRITICAL = percent < critBattPercent;
 
   u8g2Fonts.setCursor(63, 11);
   if (!BATTERY_CRITICAL)
