@@ -120,10 +120,10 @@
 > 
 > After recent code optimizations, power efficiency has significantly improved:
 > 
-> | Mode | Duration | Status |
+> | Mode | Duration (Awake) | Status |
 > |------|----------|---------|
-> | Normal Active Mode | ~22s | ![Status](https://img.shields.io/badge/22s-Normal-blue) |
-> | Sleep Transition | ~20s | ![Status](https://img.shields.io/badge/20s-Expected-green) |
+> | Active-Active | ~22s | ![Status](https://img.shields.io/badge/22s-Normal-blue) |
+> | Sleep-Active-Sleep | ~20s | ![Status](https://img.shields.io/badge/20s-Expected-green) |
 > | Sleep-to-Sleep | <1s | ![Status](https://img.shields.io/badge/<1s-Optimal-success) |
 >
 > ✨ **Key Improvements**:
@@ -302,9 +302,9 @@
 - ⚡ **Deep Sleep Current**:
   - XIAO ESP32 C6: ~20µA total
     - 14.3µA from ESP32C6 core ([Source](https://sigmdel.ca/michel/ha/xiao/xiao_esp32c6_intro_en.html#deep_sleep))
-    - ~6µA from all peripheral devices (RTC, sensors, etc.)
-  - XIAO ESP32 C3: Higher deep sleep current
-  - XIAO ESP32 S3: Potentially lower deep sleep current (untested)
+    - ~6µA from all peripheral devices in standby (RTC, sensors, etc.)
+  - XIAO ESP32 C3: Higher deep sleep current (~43µA, tested)
+  - XIAO ESP32 S3: Potentially lower deep sleep current (~11.9µA, untested)
     - Not used due to project's modest performance needs
     - Could be viable alternative for maximum battery life
 
@@ -436,6 +436,19 @@
    - Display sleeps when dark
    - 5-minute wake intervals
    - Power saving features
+
+### Software Updates
+- 🔄 **Current Update Method**:
+  - No OTA (Over-The-Air) updates due to memory constraints
+  - Manual update process required:
+    1. Turn OFF the clock using flip switch
+    2. Press and HOLD the debug button (D6)
+    3. While holding debug button, turn ON the clock
+    4. It will disable sleep
+    5. Release debug button when display starts to refresh
+    6. Display will show temperature and then "DEBUG MODE" (No need to wait for this)
+    7. Connect to PC via USB-C cable
+    8. Upload new code using Arduino IDE
 
 ## 🌿 Environmental Impact
 

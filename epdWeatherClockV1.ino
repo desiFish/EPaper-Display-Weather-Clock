@@ -302,20 +302,13 @@ void weatherPrint(bool invert = false);
 void setup()
 {
   setCpuFrequencyMhz(20); // Set CPU to 20MHz
-  pinMode(LED_BUILTIN, OUTPUT);
-
-  if (DEBUG_MODE)
-  {
-    Serial.begin(115200);
-    digitalWrite(LED_BUILTIN, HIGH);
-  }
-
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
   if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
     DEBUG_MODE = true;
   if (DEBUG_MODE)
   {
+    Serial.begin(115200);
     Serial.println("Setup");
     Serial.println(getCpuFrequencyMhz());
   }
