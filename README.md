@@ -122,8 +122,8 @@
 <h3>🚀 Coming Soon: Ultra-Low Power Mode</h3>
 <p style="color: #155724; background-color: #d4edda; padding: 10px; border-radius: 5px;">
 Using SparkFun TPL5110 Timer + Power Management Board:<br>
-Current Draw: 20µA → 35nA<br>
-<b>That's a 571,328% reduction in power consumption!</b>
+Sleep Current Draw: 20µA → 35nA<br>
+<b>That's a 571,328% reduction in sleep power consumption!</b>
 </p>
 <details>
 <summary>💡 How it works</summary>
