@@ -173,9 +173,10 @@ float batteryLevel()
 
 /**
  * @brief Disables WiFi and enters power saving mode
+ * @param extreme If true, reduces CPU frequency to 10MHz
  * @note Reduces CPU frequency and disables unused peripherals
  */
-void turnOffWifi()
+void turnOffWifi(bool extreme = false)
 {
   // Disable WiFi
   WiFi.disconnect(true); // Disconnect and clear credentials
@@ -184,8 +185,11 @@ void turnOffWifi()
   // Additional power savings
   btStop(); // Disable Bluetooth - more compatible than esp_bt_controller_disable()
   // Reduce CPU frequency last
-  setCpuFrequencyMhz(20); // Set CPU to 20MHz
-  delay(5);               // wait for 5ms
+  if (extreme)
+    setCpuFrequencyMhz(10); // Set CPU to 10MHz
+  else
+    setCpuFrequencyMhz(20); // Set CPU to 20MHz
+  delay(5);                 // wait for 5ms
   if (DEBUG_MODE)
   {
     Serial.println("Power saving mode enabled");
@@ -255,8 +259,17 @@ bool autoTimeUpdate(bool forceUpdate = false)
   return false;
 }
 
-// forward declaration
+/**
+ * @brief Prints temperature and environmental data
+ * @param offset Vertical offset for display positioning (default: 0)
+ * @param invert Inverts colors for ghost protection (default: false)
+ */
 void tempPrint(byte offset = 0, bool invert = false);
+/**
+ * @brief Fetches and displays weather data
+ * @param invert Inverts display colors for ghost protection
+ * @note Requires active WiFi connection and valid API keys
+ */
 void weatherPrint(bool invert = false);
 
 //=============== MAIN SETUP AND LOOP ===============
@@ -319,7 +332,7 @@ void setup()
   bool tempBATTERY_CRITICAL = BATTERY_CRITICAL;
 
   if (BATTERY_CRITICAL)
-    turnOffWifi(); // wifioff cpu speed reduced to save power
+    turnOffWifi(true); // turn off wifi to save power when battery is critical
 
   Wire.begin();                         // Start the I2C communication
   Wire.setClock(400000);                // Set clock speed to be the fastest for better communication (fast mode)
@@ -491,11 +504,10 @@ void setup()
     bme.setIIRFilterSize(BME680_FILTER_SIZE_7);
     bme.setGasHeater(0, 0); // 0*C for 0 ms
 
-    if (!BATTERY_CRITICAL)
+    if (!BATTERY_CRITICAL) // Connect to Wi-Fi network with SSID and password if battery is not critical
     {
-      // Connect to Wi-Fi network with SSID and password if battery is not critical
       setCpuFrequencyMhz(80); // Set CPU to 80MHz for wifi
-      delay(10);
+      delay(5);
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid.c_str(), password.c_str());
       while (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -505,51 +517,56 @@ void setup()
         break;
       }
 
-      if (DEBUG_MODE)
-      {
-        Serial.println("IP Address: ");
-        Serial.println(WiFi.localIP());
-      }
-
-      // Get the current day
-      if (!pref.isKey("timeNeedsUpdate")) // create key:value pairs
-        pref.putBool("timeNeedsUpdate", true);
-      bool timeNeedsUpdate = pref.getBool("timeNeedsUpdate", false);
-
-      DateTime now = rtc.now();
-      if ((now.year() == 1970) || rtc.lostPower())
-        timeNeedsUpdate = true;
-      byte currentDay = now.day();
-
-      // Check if we need to update time (once per day)
-      if (!pref.isKey("lastCheckedDay")) // create key:value pairs
-        pref.putUChar("lastCheckedDay", 0);
-      byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
-      if ((lastCheckedDay != currentDay) || timeNeedsUpdate)
+      if (WiFi.status() == WL_CONNECTED) // if wifi is connected
       {
         if (DEBUG_MODE)
-          Serial.println("Updating time from NTP server");
-        if (autoTimeUpdate(timeNeedsUpdate)) // Update time from NTP server
+        {
+          Serial.println("IP Address: ");
+          Serial.println(WiFi.localIP());
+        }
+
+        // Get the current day
+        if (!pref.isKey("timeNeedsUpdate")) // create key:value pairs
+          pref.putBool("timeNeedsUpdate", true);
+        bool timeNeedsUpdate = pref.getBool("timeNeedsUpdate", false);
+
+        DateTime now = rtc.now();
+        if ((now.year() == 1970) || rtc.lostPower())
+          timeNeedsUpdate = true;
+        byte currentDay = now.day();
+
+        // Check if we need to update time (once per day)
+        if (!pref.isKey("lastCheckedDay")) // create key:value pairs
+          pref.putUChar("lastCheckedDay", 0);
+        byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
+        if ((lastCheckedDay != currentDay) || timeNeedsUpdate)
+        {
           if (DEBUG_MODE)
-            Serial.println("Time Updated");
-          else if (DEBUG_MODE)
-            Serial.println("Time Not updated");
-        timeNeedsUpdate = false;
-        pref.putBool("timeNeedsUpdate", false);
-        lastCheckedDay = currentDay;
-        pref.putUChar("lastCheckedDay", lastCheckedDay);
+            Serial.println("Updating time from NTP server");
+          if (autoTimeUpdate(timeNeedsUpdate)) // Update time from NTP server
+            if (DEBUG_MODE)
+              Serial.println("Time Updated");
+            else if (DEBUG_MODE)
+              Serial.println("Time Not updated");
+          timeNeedsUpdate = false;
+          pref.putBool("timeNeedsUpdate", false);
+          lastCheckedDay = currentDay;
+          pref.putUChar("lastCheckedDay", lastCheckedDay);
+        }
+        else if (DEBUG_MODE)
+          Serial.println("Time already updated");
+
+        // Check if the API keys are saved in the preferences
+        if (!pref.isKey("api")) // create key:value pairs
+          pref.putString("api", openWeatherMapApiKey);
+        openWeatherMapApiKey = pref.getString("api", "");
+
+        if (!pref.isKey("apiCustom")) // create key:value pairs
+          pref.putString("apiCustom", customApiKey);
+        customApiKey = pref.getString("apiCustom", "");
       }
-      else if (DEBUG_MODE)
-        Serial.println("Time already updated");
-
-      // Check if the API keys are saved in the preferences
-      if (!pref.isKey("api")) // create key:value pairs
-        pref.putString("api", openWeatherMapApiKey);
-      openWeatherMapApiKey = pref.getString("api", "");
-
-      if (!pref.isKey("apiCustom")) // create key:value pairs
-        pref.putString("apiCustom", customApiKey);
-      customApiKey = pref.getString("apiCustom", "");
+      else
+        turnOffWifi(); // turn off wifi to save power when wifi is not connected
     }
 
     hTemp = pref.getFloat("hTemp", -1.0);
@@ -574,9 +591,9 @@ void setup()
 
   if (lux == 0)
   {
-    TIME_TO_SLEEP = 300; // 5 min wake period while darkness sleeping
-    if (nightFlag == 0)
-    { // prevents unnecessary redrawing of same thing
+    TIME_TO_SLEEP = 300; // 5 min sleep time in dark mode
+    if (nightFlag == 0)  // prevents unnecessary redrawing of same thing in dark mode
+    {
       nightFlag = 1;
       display.setRotation(0);
       display.setFullWindow();
@@ -584,13 +601,13 @@ void setup()
       do
       {
         display.fillScreen(GxEPD_WHITE);
-        display.drawInvertedBitmap(0, 0, nightMode, 400, 300, GxEPD_BLACK);
+        display.drawInvertedBitmap(0, 0, nightMode, 400, 300, GxEPD_BLACK); // display sleep icon
       } while (display.nextPage());
     }
     display.hibernate();
     display.powerOff();
   }
-  else
+  else // if lux is not 0, then the device is in normal mode
   {
     nightFlag = 0;
     display.setRotation(0);
@@ -598,7 +615,7 @@ void setup()
     display.firstPage();
     do
     {
-      if (WiFi.status() == WL_CONNECTED)
+      if (WiFi.status() == WL_CONNECTED) // if wifi is connected, then fetch weather data
       {
         ++bootCount; // increment the boot counter
         if (DEBUG_MODE)
@@ -609,21 +626,20 @@ void setup()
           tempPrint(0, true); // prints temperature and battery level
           weatherPrint(true); // prints weather data
         }
-        else
+        else // if not ghost protection, then normal display
         {
           display.fillScreen(GxEPD_WHITE);
           tempPrint();    // prints temperature and battery level
           weatherPrint(); // prints weather data
         }
-        if (bootCount == ghostProtek)
+        if (bootCount == ghostProtek) // reset boot counter after ghost protection
           bootCount = 0;
         if (DEBUG_MODE)
           Serial.println("Time And Weather Done");
       }
-      else
+      else // if wifi is not connected, then only display time
       {
         display.fillScreen(GxEPD_WHITE);
-        turnOffWifi(); // turn off wifi to save power when wifi is not connected
         if (DEBUG_MODE)
           Serial.println("Time Only");
         display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
@@ -639,8 +655,8 @@ void setup()
   if (DEBUG_MODE)
     Serial.println("Data Write");
 
-  if (lux != 0)
-  { // if lux is 0, then the device is in sleep mode and no need to save data
+  if (lux != 0) // if lux is 0, then the device is in sleep mode and no need to save data
+  {
     if (hTempHold != hTemp)
       pref.putFloat("hTemp", hTemp);
     if (lTempHold != lTemp)
@@ -664,12 +680,14 @@ void setup()
     Serial.flush(); // Flush the serial buffer
     delay(5);
   }
-  // Enter deep sleep
+
   if (!DEBUG_MODE) // if debug mode is off, then go to deep sleep
   {
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
-    esp_deep_sleep_start();
+    esp_deep_sleep_start();                                        // Enter deep sleep
   }
+  else
+  Serial.println("Going to loop");
 }
 
 /**
@@ -930,14 +948,12 @@ void weatherPrint(bool invert)
   if (myObject["current"]["temp"] == null)
   {
     networkInfo();
-    // Turn off WiFi as soon as possible after data fetch
-    turnOffWifi();
+    turnOffWifi(); // Turn off WiFi as soon as possible after data fetch
   }
   else
   {
     wifiStatus(invert);
-    // Turn off WiFi as soon as possible after data fetch
-    turnOffWifi();
+    turnOffWifi(); // Turn off WiFi as soon as possible after data fetch
     u8g2Fonts.setFontMode(1);
     u8g2Fonts.setFontDirection(0);
     u8g2Fonts.setForegroundColor(fg);
