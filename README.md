@@ -70,11 +70,10 @@
 <td width="50%" align="center">
   
 ### 🆕 Latest Version
-[**v0.3.0**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.3.0)
-- 🚀 Transition to stable release from beta
+[**v0.3.2**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.3.2)
 - 🔧 Enhanced overall system efficiency
 - 🔋 Improved power management algorithms
-- 💾 Optimized storage utilization
+- 💾 Improved readability
   
 </td>
 <td width="50%" align="center">
@@ -114,6 +113,25 @@
 ![CPU](https://img.shields.io/badge/CPU-Monitored-blue?style=for-the-badge)
 ![Efficiency](https://img.shields.io/badge/Efficiency-Enhanced-green?style=for-the-badge)
 
+</div>
+
+<div align="center">
+<table style="width: 80%; margin: 20px auto; border: 2px solid #4CAF50; border-radius: 10px; padding: 15px;">
+<tr>
+<td style="text-align: center; background-color: #f8f9fa;">
+<h3>🚀 Coming Soon: Ultra-Low Power Mode</h3>
+<p style="color: #155724; background-color: #d4edda; padding: 10px; border-radius: 5px;">
+Using SparkFun TPL5110 Timer + Power Management Board:<br>
+Current Draw: 20µA → 35nA<br>
+<b>That's a 571,328% reduction in power consumption!</b>
+</p>
+<details>
+<summary>💡 How it works</summary>
+<p>The TPL5110 completely cuts power to the system between updates, reducing standby current to near-zero levels. This improvement will dramatically extend battery life!</p>
+</details>
+</td>
+</tr>
+</table>
 </div>
 
 > 📊 **Performance Metrics**
