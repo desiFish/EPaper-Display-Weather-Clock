@@ -318,9 +318,9 @@ Sleep Current Draw: 20µA → 35nA<br>
 
 ### Power Consumption Comparison
 - ⚡ **Deep Sleep Current**:
-  - XIAO ESP32 C6: ~20µA total
+  - XIAO ESP32 C6: ~25µA total
     - 14.3µA from ESP32C6 core ([Source](https://sigmdel.ca/michel/ha/xiao/xiao_esp32c6_intro_en.html#deep_sleep))
-    - ~6µA from all peripheral devices in standby (RTC, sensors, etc.)
+    - ~11µA from all peripheral devices in standby (RTC, sensors, etc.)
   - XIAO ESP32 C3: Higher deep sleep current (~43µA, tested)
   - XIAO ESP32 S3: Potentially lower deep sleep current (~11.9µA, untested)
     - Not used due to project's modest performance needs
