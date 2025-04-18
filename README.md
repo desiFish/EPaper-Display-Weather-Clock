@@ -192,19 +192,8 @@ Sleep Current Draw: 20µA → 35nA<br>
   </tr>
   <tr>
     <td>Second Cycle</td>
+    <td>18/04/2025 - Ongoing</td>
     <td>Ongoing</td>
-    <td>Ongoing</td>
-  </tr>
-</table>
-### Current Cycle (Ongoing)
-<table>
-  <tr>
-    <th>Cycle</th>
-    <th>Full Charge Date</th>
-  </tr>
-  <tr>
-    <td>First Cycle</td>
-    <td>April 18, 2025</td>
   </tr>
 </table>
 
