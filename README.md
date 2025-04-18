@@ -70,9 +70,8 @@
 <td width="50%" align="center">
   
 ### 🆕 Latest Version
-[**v0.3.2**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.3.2)
+[**v0.4.0**](https://github.com/desiFish/ESP32-ePaper-Display-Weather-Clock/releases/tag/v0.4.0)
 - 🔧 Enhanced overall system efficiency
-- 🔋 Improved power management algorithms
 - 💾 Improved readability
   
 </td>
@@ -140,7 +139,7 @@ Sleep Current Draw: 20µA → 35nA<br>
 > 
 > | Mode | Duration (Awake) | Status |
 > |------|----------|---------|
-> | Active-Active | ~22s | ![Status](https://img.shields.io/badge/22s-Normal-blue) |
+> | Active-Active | ~27s | ![Status](https://img.shields.io/badge/22s-Normal-blue) |
 > | Sleep-Active-Sleep | ~20s | ![Status](https://img.shields.io/badge/20s-Expected-green) |
 > | Sleep-to-Sleep | <1s | ![Status](https://img.shields.io/badge/<1s-Optimal-success) |
 >
@@ -153,8 +152,8 @@ Sleep Current Draw: 20µA → 35nA<br>
 
 > 📝 **Note**: Historical data below is from testing with Li-ion ICR batteries. The shorter duration in cycles 2 and 3 (49 and 48 days vs 73 days) was due to incomplete charging (batteries not reaching full 4.2V). New performance data with 8000mAh LFP batteries (which are more cost-effective) is being collected.
 
-### ICR Battery Data
-
+### ICR Battery Data (OLD)
+<details>
 <table>
   <tr>
     <th>Cycle</th>
@@ -177,29 +176,32 @@ Sleep Current Draw: 20µA → 35nA<br>
     <td>~7 weeks</td>
   </tr>
 </table>
+</details>
 
-### LFP Battery Data (Ongoing)
+### LFP Battery Data (NEW)
+<table>
+  <tr>
+    <th>Cycle</th>
+    <th>Duration</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td>First Cycle</td>
+    <td>107 Days</td>
+    <td>09/01/2025 - 18/04/2025 (3 months 17 days)</td>
+  </tr>
+</table>
+### Current Cycle (Ongoing)
 <table>
   <tr>
     <th>Cycle</th>
     <th>Full Charge Date</th>
-    <th>Battery Dead Date</th>
-    <th>Duration</th>
   </tr>
   <tr>
     <td>First Cycle</td>
-    <td>January 09, 2025</td>
-    <td>Coming Soon</td>
-    <td>Ongoing</td>
+    <td>April 18, 2025</td>
   </tr>
 </table>
-
-<div align="center">
-  <h4>📉 Battery Life Trend (ICR Battery Data)</h4>
-  First: ████████████████████ 73 days<br>
-  Second: █████████████ 49 days<br>
-  Third: █████████████ 48 days
-</div>
 
 ### Current Consumption
 > ⚠️ **Note**: Precise current consumption measurements for the entire project are not available due to equipment limitations. Please refer to the Battery Performance section above for real-world usage data and longevity estimates.

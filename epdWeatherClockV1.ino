@@ -59,7 +59,7 @@ String ssid;
 String password;
 
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "asia.pool.ntp.org", 19800); // 19800 is offset of India, asia.pool.ntp.org is close to India
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 19800); // 19800 is offset of India, pool.ntp.org automatically selects nearest pool for you
 
 // save number of boots
 RTC_DATA_ATTR int bootCount = 0; // Persistent boot counter stored in RTC memory
@@ -82,9 +82,9 @@ Adafruit_BME680 bme;     // Initalize environmental sensor
 BH1750 lightMeter(0x23); // Initalize light sensor
 
 // Initalize display for 400x300, UC8276
-GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS=5*/ /* SS*/ D7, /*DC=*/D1, /*RST=*/D2, /*BUSY=*/D3));
-#define BATPIN A0    // Battery voltage divider pin (1M Ohm with 104 Capacitor)
-#define DEBUG_PIN D6 // Debug mode toggle pin
+GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS=5*/ /* SS*/ D7, /*DC=*/D1, /*RST=*/D2, /*BUSY=*/D3)); // universal declaration for XIAO series
+#define BATPIN A0                                                                                                                      // Battery voltage divider pin (1M Ohm with 104 Capacitor)
+#define DEBUG_PIN D6                                                                                                                   // Debug mode toggle pin
 
 /*
 GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(20, 3, 4, 5)); //for XIAO_ESP32C3 in case the above declaration gives error
@@ -102,9 +102,8 @@ U8G2_FOR_ADAFRUIT_GFX u8g2Fonts; // u8g2 fonts
 //=============== GLOBAL CONSTANTS ===============
 #define BATTERY_LEVEL_SAMPLING 4 // BATTERY_LEVEL_SAMPLING: Number of samples to average for battery reading
 #define battType 3.6             // battType: Battery nominal voltage (ICR: 4.2V, LFP: 3.6V) (Change accordingly)
-#define battChangeThreshold 0.15 // battChangeThreshold: Minimum voltage change to update battery level
-#define battUpperLim 3.3         // battUpperLim: Maximum expected battery voltage (Change accordingly)
-#define battHigh 3.4             // battHigh: Healthy battery threshold voltage (Change accordingly)
+#define battChangeThreshold 0.06 // battChangeThreshold: Minimum voltage change to update battery level
+#define battHigh 3.3             // battHigh: Healthy battery threshold voltage (Change accordingly)
 #define battLow 2.9              // battLow: Low battery warning threshold (Change accordingly)
 #define critBattPercent 30       // critBattPercent: Critical battery percentage threshold
 
@@ -118,10 +117,10 @@ int TIME_TO_SLEEP = 900; // 15 minutes
 
 //=============== GLOBAL VARIABLES ===============
 // State variables
-int nightFlag = 0;             // Night mode state preserved across sleep
-float battLevel;               // Current battery level
-bool DEBUG_MODE = false;       // Debug mode state
-bool BATTERY_CRITICAL = false; // Critical battery state
+RTC_DATA_ATTR byte nightFlag = 0; // Night mode state preserved across sleep
+float battLevel;                  // Current battery level
+bool DEBUG_MODE = false;          // Debug mode state
+bool BATTERY_CRITICAL = false;    // Critical battery state
 
 String jsonBuffer; // for storing json data from api
 
@@ -199,64 +198,41 @@ void turnOffWifi(bool extreme = false)
 
 /**
  * @brief Updates RTC time from NTP server if necessary
- *
- * This function checks if an update is needed based on the following criteria:
- * 1. If it's the first run (lastUpdateDay is 0)
- * 2. If 20 days have passed since the last update
- * 3. If a force update is requested
- *
- * It handles month rollovers when calculating days passed.
  * If an update is needed and WiFi is connected, it fetches the current time
  * from an NTP server and updates the RTC.
  *
- * @param forceUpdate If true, bypasses the normal update interval check
  * @return bool Returns true if the time was successfully updated, false otherwise
  * @note Requires an active WiFi connection to function
- * @note Uses Preferences to store the last update day
  */
-bool autoTimeUpdate(bool forceUpdate = false)
+bool autoTimeUpdate()
 {
-  if (!pref.isKey("lastUpdateDay"))
-    pref.putUChar("lastUpdateDay", 0);
-
-  byte lastUpdateDay = pref.getUChar("lastUpdateDay", 0);
-  DateTime now = rtc.now();
-  byte currentDay = now.day();
-
-  // Calculate days passed, handling month rollover
-  int daysPassed = (currentDay - lastUpdateDay + 31) % 31; // Handle month rollover
-
-  // Check if 20 days have passed since last update
-  if (lastUpdateDay == 0 || daysPassed >= 20 || forceUpdate)
+  if (WiFi.status() == WL_CONNECTED)
   {
-    if (WiFi.status() == WL_CONNECTED)
+    timeClient.begin();
+    if (timeClient.update() && timeClient.isTimeSet())
     {
-      timeClient.begin();
-      if (timeClient.update() && timeClient.isTimeSet())
-      {
-        time_t rawtime = timeClient.getEpochTime();
-        struct tm *ti = localtime(&rawtime);
+      time_t rawtime = timeClient.getEpochTime();
+      struct tm *ti = localtime(&rawtime);
 
-        uint16_t year = ti->tm_year + 1900;
-        uint8_t month = ti->tm_mon + 1;
-        uint8_t day = ti->tm_mday;
+      uint16_t year = ti->tm_year + 1900;
+      uint8_t month = ti->tm_mon + 1;
+      uint8_t day = ti->tm_mday;
 
-        rtc.adjust(DateTime(year, month, day,
-                            timeClient.getHours(),
-                            timeClient.getMinutes(),
-                            timeClient.getSeconds()));
+      rtc.adjust(DateTime(year, month, day,
+                          timeClient.getHours(),
+                          timeClient.getMinutes(),
+                          timeClient.getSeconds()));
 
-        // Update last update day
-        pref.putUChar("lastUpdateDay", currentDay);
-        if (DEBUG_MODE)
-        {
-          Serial.println("RTC updated: " + String(year) + "-" + String(month) + "-" + String(day));
-        }
-        return true;
-      }
+      if (DEBUG_MODE)
+        Serial.println("RTC updated: " + String(year) + "-" +
+                       String(month) + "-" + String(day));
+      return true;
     }
+    else
+      return false;
   }
-  return false;
+  else
+    return false;
 }
 
 /**
@@ -340,12 +316,6 @@ void setup()
   display.init(115200, true, 2, false); // USE THIS for Waveshare boards with "clever" reset circuit, 2ms reset pulse
 
   u8g2Fonts.begin(display); // connect u8g2 procedures to Adafruit GFX
-
-  if (!pref.isKey("nightFlag"))
-  { // create key:value pair
-    pref.putBool("nightFlag", false);
-  }
-  nightFlag = pref.getBool("nightFlag", false);
 
   if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
   {
@@ -440,7 +410,7 @@ void setup()
           }
         }
         request->send(200, "text/html", "<h2>Done. Weather Station will now restart</h2>");
-        delay(3000);
+        delay(2000);
         ESP.restart(); });
       server.begin();
       while (true)
@@ -507,7 +477,7 @@ void setup()
     if (!BATTERY_CRITICAL) // Connect to Wi-Fi network with SSID and password if battery is not critical
     {
       setCpuFrequencyMhz(80); // Set CPU to 80MHz for wifi
-      delay(5);
+      delay(2);
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid.c_str(), password.c_str());
       while (WiFi.waitForConnectResult() != WL_CONNECTED)
@@ -531,30 +501,37 @@ void setup()
         bool timeNeedsUpdate = pref.getBool("timeNeedsUpdate", false);
 
         DateTime now = rtc.now();
-        if ((now.year() == 1970) || rtc.lostPower())
+        if ((now.year() == 1970) || rtc.lostPower()) // if RTC lost power or not set
           timeNeedsUpdate = true;
+
+        // Get the current day
         byte currentDay = now.day();
 
-        // Check if we need to update time (once per day)
+        // Check if we need to update time (every 15 days)
         if (!pref.isKey("lastCheckedDay")) // create key:value pairs
           pref.putUChar("lastCheckedDay", 0);
         byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
-        if ((lastCheckedDay != currentDay) || timeNeedsUpdate)
+        byte daysPassed = (currentDay - lastCheckedDay + 31) % 31;
+
+        if ((daysPassed >= 15) || timeNeedsUpdate) // check if 15 days passed or force update
         {
-          if (DEBUG_MODE)
-            Serial.println("Updating time from NTP server");
-          if (autoTimeUpdate(timeNeedsUpdate)) // Update time from NTP server
+          Serial.println("Updating time from NTP server");
+          if (autoTimeUpdate()) // Update time from NTP server
+          {
             if (DEBUG_MODE)
               Serial.println("Time Updated");
-            else if (DEBUG_MODE)
-              Serial.println("Time Not updated");
-          timeNeedsUpdate = false;
-          pref.putBool("timeNeedsUpdate", false);
-          lastCheckedDay = currentDay;
-          pref.putUChar("lastCheckedDay", lastCheckedDay);
+            timeNeedsUpdate = false;
+          }
+          else
+          {
+            if (DEBUG_MODE)
+              Serial.println("Time Update Failed");
+          }
+          pref.putBool("timeNeedsUpdate", timeNeedsUpdate);
+          pref.putUChar("lastCheckedDay", currentDay); // Update last checked day
         }
-        else if (DEBUG_MODE)
-          Serial.println("Time already updated");
+        else
+          Serial.println("Time Update Not Required");
 
         // Check if the API keys are saved in the preferences
         if (!pref.isKey("api")) // create key:value pairs
@@ -583,8 +560,6 @@ void setup()
 
     hTempHold = hTemp, lTempHold = lTemp, tempBattLevel = battLevel;
   }
-
-  bool tempNightFlag = nightFlag;
 
   if (DEBUG_MODE)
     Serial.println("Setup done");
@@ -666,8 +641,6 @@ void setup()
     if (tempBATTERY_CRITICAL != BATTERY_CRITICAL)
       pref.putBool("battCrit", BATTERY_CRITICAL);
   }
-  if (tempNightFlag != nightFlag) // if night mode changes, then save the new state
-    pref.putBool("nightFlag", nightFlag);
 
   pref.end(); // Close the preferences
   Wire.end(); // End I2C communication
@@ -687,7 +660,7 @@ void setup()
     esp_deep_sleep_start();                                        // Enter deep sleep
   }
   else
-  Serial.println("Going to loop");
+    Serial.println("Going to loop");
 }
 
 /**
@@ -789,7 +762,7 @@ void tempPrint(byte offset, bool invert)
 
   // Battery level handling
   float newBattLevel = batteryLevel();
-  battLevel = (newBattLevel < battLevel) ? newBattLevel : ((newBattLevel - battLevel) >= battChangeThreshold || newBattLevel > battUpperLim) ? newBattLevel
+  battLevel = (newBattLevel < battLevel) ? newBattLevel : ((newBattLevel - battLevel) >= battChangeThreshold || newBattLevel > battHigh) ? newBattLevel
                                                                                                                                              : battLevel;
 
   // Battery display section
