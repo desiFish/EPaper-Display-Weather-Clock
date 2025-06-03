@@ -30,6 +30,13 @@
 
 ---
 
+## 📝 Schematics
+
+<div align="center">
+  <img src="https://github.com/KamadoTanjiro-beep/epdWeatherClockV1/blob/main/resources/schematics.png" alt="Circuit Schematics" width="800"/>
+  <p><i>Project Circuit Schematics</i></p>
+</div>
+
 ## 🛠️ Hardware Components
 
 <table>
