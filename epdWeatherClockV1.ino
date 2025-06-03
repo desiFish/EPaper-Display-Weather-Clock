@@ -66,10 +66,10 @@ RTC_DATA_ATTR int bootCount = 0; // Persistent boot counter stored in RTC memory
 const byte ghostProtek = 5;      // ghost protection, 5 means for every 5 boots, 1 boot will be in dark mode
 
 // openWeatherMap Api Key from your profile in account section
-String openWeatherMapApiKey = ""; // add your profile key here when running for the first time
+String openWeatherMapApiKey = "017a22a3caeb4260fde55658d2d33abc"; // add your profile key here when running for the first time
 
 // personal custom Api Key from your server
-String customApiKey = ""; // add your api key here when running for the first time
+String customApiKey = "33b138598b0187b6c1de7400145a22ff"; // add your api key here when running for the first time
 
 // Replace with your lat and lon
 String lat = "22.5895515";
@@ -117,15 +117,14 @@ int TIME_TO_SLEEP = 900; // 15 minutes
 
 //=============== GLOBAL VARIABLES ===============
 // State variables
-RTC_DATA_ATTR byte nightFlag = 0; // Night mode state preserved across sleep
-float battLevel;                  // Current battery level
-bool DEBUG_MODE = false;          // Debug mode state
-bool BATTERY_CRITICAL = false;    // Critical battery state
+RTC_DATA_ATTR byte nightFlag = 0;            // Night mode state preserved across sleep
+RTC_DATA_ATTR float hTemp = 0.0;             // Highest temperature recorded
+RTC_DATA_ATTR float lTemp = 60.0;            // Lowest temperature recorded
+RTC_DATA_ATTR float battLevel = battType;    // Battery level
+RTC_DATA_ATTR bool BATTERY_CRITICAL = false; // Critical battery state
+bool DEBUG_MODE = false;                     // Debug mode state
 
 String jsonBuffer; // for storing json data from api
-
-// for storing highest temp and lowest temp of the day
-float hTemp, lTemp;
 
 char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -241,6 +240,13 @@ bool autoTimeUpdate()
  * @param invert Inverts colors for ghost protection (default: false)
  */
 void tempPrint(byte offset = 0, bool invert = false);
+
+/**
+ * @brief Displays network debugging information
+ * @param msg Message to display in debug info
+ */
+void networkInfo(String msg = "");
+
 /**
  * @brief Fetches and displays weather data
  * @param invert Inverts display colors for ghost protection
@@ -302,10 +308,6 @@ void setup()
     Serial.println(getCpuFrequencyMhz());
   }
   pref.begin("database", false); // Open the preferences "database"
-  if (!pref.isKey("battCrit"))
-    pref.putBool("battCrit", false);
-  BATTERY_CRITICAL = pref.getBool("battCrit", false);
-  bool tempBATTERY_CRITICAL = BATTERY_CRITICAL;
 
   if (BATTERY_CRITICAL)
     turnOffWifi(true); // turn off wifi to save power when battery is critical
@@ -418,8 +420,6 @@ void setup()
     }
   }
 
-  float hTempHold, lTempHold, tempBattLevel;
-
   // if lux is 0, then the device is in dark mode and no need to initialize sensors
   if (lux != 0 || DEBUG_MODE == true)
   {
@@ -437,8 +437,8 @@ void setup()
 
     if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
     { // reset high low at midnight
-      pref.putFloat("hTemp", 0.0);
-      pref.putFloat("lTemp", 60.0);
+      hTemp = 0.0;
+      lTemp = 60.0;
     }
 
     if (sensor.begin() == true) // Function to check if the TMP117 will correctly self-identify with the proper Device ID/Address
@@ -545,20 +545,6 @@ void setup()
       else
         turnOffWifi(); // turn off wifi to save power when wifi is not connected
     }
-
-    hTemp = pref.getFloat("hTemp", -1.0);
-    lTemp = pref.getFloat("lTemp", -1.0);
-    battLevel = pref.getFloat("battLevel", -1.0);
-    if (hTemp == -1.0 || lTemp == -1.0 || battLevel == -1.0)
-    {
-      if (DEBUG_MODE)
-        Serial.println("No values saved for hTemp, lTemp or battLevel");
-      pref.putFloat("hTemp", 0.0);
-      pref.putFloat("lTemp", 60.0);
-      pref.putFloat("battLevel", battType);
-    }
-
-    hTempHold = hTemp, lTempHold = lTemp, tempBattLevel = battLevel;
   }
 
   if (DEBUG_MODE)
@@ -611,6 +597,8 @@ void setup()
           bootCount = 0;
         if (DEBUG_MODE)
           Serial.println("Time And Weather Done");
+        // Turn off WiFi as soon as possible
+        turnOffWifi();
       }
       else // if wifi is not connected, then only display time
       {
@@ -629,18 +617,6 @@ void setup()
 
   if (DEBUG_MODE)
     Serial.println("Data Write");
-
-  if (lux != 0) // if lux is 0, then the device is in sleep mode and no need to save data
-  {
-    if (hTempHold != hTemp)
-      pref.putFloat("hTemp", hTemp);
-    if (lTempHold != lTemp)
-      pref.putFloat("lTemp", lTemp);
-    if (tempBattLevel != battLevel)
-      pref.putFloat("battLevel", battLevel);
-    if (tempBATTERY_CRITICAL != BATTERY_CRITICAL)
-      pref.putBool("battCrit", BATTERY_CRITICAL);
-  }
 
   pref.end(); // Close the preferences
   Wire.end(); // End I2C communication
@@ -735,6 +711,28 @@ String weatherDataAPI(const char *serverName)
 }
 
 /**
+ * @brief Checks HTTP response code and displays error if needed
+ * @param source String identifying the API source for debug messages
+ * @return bool Returns true if response code is 200, false otherwise
+ */
+bool checkHttpResponse(const char *source)
+{
+  if (httpResponseCode == -1 || httpResponseCode == -11)
+  {
+    ESP.restart();
+    return false;
+  }
+  else if (httpResponseCode != 200)
+  {
+    if (DEBUG_MODE)
+      Serial.println(String(source) + " API request failed with code: " + String(httpResponseCode));
+    networkInfo(source);
+    return false;
+  }
+  return true;
+}
+
+/**
  * @brief Prints temperature and environmental data
  * @param offset Vertical offset for display positioning (default: 0)
  * @param invert Inverts colors for ghost protection (default: false)
@@ -763,7 +761,7 @@ void tempPrint(byte offset, bool invert)
   // Battery level handling
   float newBattLevel = batteryLevel();
   battLevel = (newBattLevel < battLevel) ? newBattLevel : ((newBattLevel - battLevel) >= battChangeThreshold || newBattLevel > battHigh) ? newBattLevel
-                                                                                                                                             : battLevel;
+                                                                                                                                         : battLevel;
 
   // Battery display section
   u8g2Fonts.setFont(u8g2_font_luRS08_tf);
@@ -884,8 +882,8 @@ void weatherPrint(bool invert)
   strcat(serverPath, openWeatherMapApiKey.c_str());
 
   jsonBuffer = weatherDataAPI(serverPath);
-  if (httpResponseCode == -1 || httpResponseCode == -11)
-    ESP.restart();
+  if (!checkHttpResponse("OpenWeather"))
+    return;
   if (DEBUG_MODE)
     Serial.println(jsonBuffer);
   JSONVar myObject = JSON.parse(jsonBuffer);
@@ -903,8 +901,8 @@ void weatherPrint(bool invert)
   strcpy(serverPath, CUSTOM_WEATHER_BASE_URL);
   strcat(serverPath, customApiKey.c_str());
   jsonBuffer = weatherDataAPI(serverPath);
-  if (httpResponseCode == -1 || httpResponseCode == -11)
-    ESP.restart();
+  if (!checkHttpResponse("Custom"))
+    return;
   if (DEBUG_MODE)
     Serial.println(jsonBuffer);
   JSONVar customObject = JSON.parse(jsonBuffer);
@@ -919,14 +917,10 @@ void weatherPrint(bool invert)
   }
 
   if (myObject["current"]["temp"] == null)
-  {
     networkInfo();
-    turnOffWifi(); // Turn off WiFi as soon as possible after data fetch
-  }
   else
   {
     wifiStatus(invert);
-    turnOffWifi(); // Turn off WiFi as soon as possible after data fetch
     u8g2Fonts.setFontMode(1);
     u8g2Fonts.setFontDirection(0);
     u8g2Fonts.setForegroundColor(fg);
@@ -1267,7 +1261,7 @@ void weatherPrint()
   }
   // Turn off WiFi as soon as possible after data fetch
   turnOffWifi();
-}*/
+}
 
 //=============== UI HELPER FUNCTIONS ===============
 
@@ -1275,7 +1269,7 @@ void weatherPrint()
  * @brief Displays network debugging information
  * @note Shows WiFi status, signal strength, and HTTP response codes
  */
-void networkInfo()
+void networkInfo(String msg)
 {
   display.drawBitmap(270, 0, wifiError, 13, 13, GxEPD_BLACK);
   display.drawBitmap(100, 160, net, 29, 28, GxEPD_BLACK);
@@ -1303,6 +1297,8 @@ void networkInfo()
     u8g2Fonts.print(" Fair");
   else
     u8g2Fonts.print(" Poor");
+  u8g2Fonts.setCursor(5, 295); // start writing at this position
+  u8g2Fonts.print("Comments: " + msg);
 }
 
 /**
