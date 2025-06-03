@@ -66,10 +66,10 @@ RTC_DATA_ATTR int bootCount = 0; // Persistent boot counter stored in RTC memory
 const byte ghostProtek = 5;      // ghost protection, 5 means for every 5 boots, 1 boot will be in dark mode
 
 // openWeatherMap Api Key from your profile in account section
-String openWeatherMapApiKey = "017a22a3caeb4260fde55658d2d33abc"; // add your profile key here when running for the first time
+String openWeatherMapApiKey = ""; // add your profile key here when running for the first time
 
 // personal custom Api Key from your server
-String customApiKey = "33b138598b0187b6c1de7400145a22ff"; // add your api key here when running for the first time
+String customApiKey = ""; // add your api key here when running for the first time
 
 // Replace with your lat and lon
 String lat = "22.5895515";
