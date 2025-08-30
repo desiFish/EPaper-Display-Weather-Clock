@@ -169,8 +169,8 @@ Sleep Current Draw: 20µA → 35nA<br>
   </tr>
   <tr>
     <td>First Cycle</td>
-    <td>73 Days</td>
-    <td>06/05/2024 - 17/07/2024 (2 months 12 days)</td>
+    <td>73 Days or 2 Months, 12 Days</td>
+    <td>06/05/2024 - 17/07/2024</td>
   </tr>
   <tr>
     <td>Second Cycle</td>
@@ -194,8 +194,8 @@ Sleep Current Draw: 20µA → 35nA<br>
   </tr>
   <tr>
     <td>First Cycle</td>
-    <td>107 Days</td>
-    <td>09/01/2025 - 18/04/2025 (3 months 17 days)</td>
+    <td>107 Days or 3 Months, 17 Days</td>
+    <td>09/01/2025 - 18/04/2025</td>
   </tr>
   <tr>
     <td>Second Cycle</td>
