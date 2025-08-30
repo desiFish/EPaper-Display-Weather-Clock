@@ -199,8 +199,13 @@ Sleep Current Draw: 20µA → 35nA<br>
   </tr>
   <tr>
     <td>Second Cycle</td>
-    <td>18/04/2025 - Ongoing</td>
-    <td>Ongoing</td>
+    <td>134 Days or 4 Months, 12 Days</td>
+    <td>18/04/2025 - 30/08/2025</td>
+  </tr>
+  <tr>
+    <td>Third Cycle</td>
+    <td>TBD</td>
+    <td>TBD - TBD</td>
   </tr>
 </table>
 
