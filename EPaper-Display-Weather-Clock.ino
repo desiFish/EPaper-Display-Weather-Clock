@@ -1,6 +1,6 @@
 /*
 epdWeatherClockV1.ino
-Copyright (C) 2024-2025 desiFish
+Copyright (C) 2024 desiFish
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -86,17 +86,6 @@ GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(/*CS
 #define BATPIN A0                                                                                                                      // Battery voltage divider pin (1M Ohm with 104 Capacitor)
 #define DEBUG_PIN D6                                                                                                                   // Debug mode toggle pin
 
-/*
-GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(20, 3, 4, 5)); //for XIAO_ESP32C3 in case the above declaration gives error
-#define BATPIN 2      // Battery voltage divider pin (1M Ohm with 104 Capacitor)
-#define DEBUG_PIN 21  // Debug mode toggle pin
-*/
-/*
-GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> display(GxEPD2_420c_Z21(17, 1, 2, 21)); //for XIAO_ESP32C6
-#define BATPIN 0      // Battery voltage divider pin (1M Ohm with 104 Capacitor)
-#define DEBUG_PIN 16  // Debug mode toggle pin
-*/
-
 U8G2_FOR_ADAFRUIT_GFX u8g2Fonts; // u8g2 fonts
 
 //=============== GLOBAL CONSTANTS ===============
@@ -128,7 +117,7 @@ bool RTC_READY = false;                      // RTC hardware state
 bool TMP117_READY = false;                   // TMP117 hardware state
 bool BME680_READY = false;                   // BME680 hardware state
 
-String jsonBuffer; // for storing json data from api
+String jsonBuffer;              // for storing json data from api
 String systemAlertMessage = ""; // Hardware/runtime alerts shown in the alert line
 
 char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
@@ -471,8 +460,8 @@ void setup()
   setCpuFrequencyMhz(20); // Set CPU to 20MHz
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
-  // if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
-  DEBUG_MODE = true;
+  if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
+    DEBUG_MODE = true;
   if (DEBUG_MODE)
   {
     Serial.begin(115200);
@@ -600,7 +589,7 @@ void setup()
         Serial.println("RTC Ready");
 
       DateTime now = rtc.now();
-      if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
+      if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < = 15))
       { // reset high low at midnight
         hTemp = 0.0;
         lTemp = 60.0;
@@ -813,7 +802,7 @@ void setup()
   if (!DEBUG_MODE) // if debug mode is off, then go to deep sleep
   {
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
-    // esp_deep_sleep_start();                                        // Enter deep sleep
+    esp_deep_sleep_start();                                        // Enter deep sleep
   }
   else
     Serial.println("DEBUG_MODE active: staying awake and entering loop");
