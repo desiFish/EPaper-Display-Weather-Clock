@@ -124,8 +124,12 @@ RTC_DATA_ATTR float lTemp = 60.0;            // Lowest temperature recorded
 RTC_DATA_ATTR float battLevel = battType;    // Battery level
 RTC_DATA_ATTR bool BATTERY_CRITICAL = false; // Critical battery state
 bool DEBUG_MODE = false;                     // Debug mode state
+bool RTC_READY = false;                      // RTC hardware state
+bool TMP117_READY = false;                   // TMP117 hardware state
+bool BME680_READY = false;                   // BME680 hardware state
 
 String jsonBuffer; // for storing json data from api
+String systemAlertMessage = ""; // Hardware/runtime alerts shown in the alert line
 
 char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -174,8 +178,63 @@ float batteryLevel()
 }
 
 /**
- * @brief Disables WiFi and enters power saving mode
- * @param extreme If true, reduces CPU frequency to 10MHz
+ * @brief Adds one hardware/runtime alert to the shared top alert line
+ */
+void addSystemAlert(const char *msg)
+{
+  if (systemAlertMessage.indexOf(msg) >= 0)
+    return;
+
+  if (systemAlertMessage.length() > 0)
+    systemAlertMessage += " | ";
+  systemAlertMessage += msg;
+}
+
+/**
+ * @brief Builds the current alert line, including dynamic battery state
+ */
+String currentAlertText()
+{
+  String text = systemAlertMessage;
+  if (BATTERY_CRITICAL)
+  {
+    if (text.length() > 0)
+      text += " | ";
+    text += "BATTERY CRITICAL";
+  }
+  return text;
+}
+
+/**
+ * @brief Prints an alert in the same compact "Alerts:" style used for weather alerts
+ * @param msg Alert text to print
+ * @param invert Clears the alert strip with the current screen background color
+ */
+void printAlertLine(String msg, bool invert)
+{
+  uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
+  display.fillRect(0, 14, 400, 16, bg);
+
+  if (msg.length() == 0)
+    return;
+
+  String text = "Alerts: " + msg;
+  if (text.length() > 58)
+    text = text.substring(0, 55) + "...";
+
+  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+  uint16_t textWidth = u8g2Fonts.getUTF8Width(text.c_str());
+  int16_t x = 0;
+  if (textWidth < display.width())
+    x = (display.width() - textWidth) / 2;
+
+  u8g2Fonts.setCursor(x, 25);
+  u8g2Fonts.print(text);
+}
+
+/**
+ * @brief Disables WiFi and lowers CPU frequency
+ * @param extreme If true, uses the lowest CPU frequency for critical-battery mode
  * @note Reduces CPU frequency and disables unused peripherals
  */
 void turnOffWifi(bool extreme = false)
@@ -194,8 +253,11 @@ void turnOffWifi(bool extreme = false)
   delay(5);                 // wait for 5ms
   if (DEBUG_MODE)
   {
-    Serial.println("Power saving mode enabled");
-    Serial.println(getCpuFrequencyMhz());
+    if (extreme)
+      Serial.println("Critical-battery power saver: WiFi off, CPU reduced");
+    else
+      Serial.println("WiFi off, CPU reduced after network activity");
+    Serial.println("CPU frequency MHz: " + String(getCpuFrequencyMhz()));
   }
 }
 
@@ -209,6 +271,9 @@ void turnOffWifi(bool extreme = false)
  */
 bool autoTimeUpdate()
 {
+  if (!RTC_READY)
+    return false;
+
   if (WiFi.status() == WL_CONNECTED)
   {
     timeClient.begin();
@@ -249,6 +314,13 @@ void onlineTimePrint(bool invert = false);
  * @param msg Message to display in debug info
  */
 void networkInfo(String msg = "");
+
+/**
+ * @brief Prints a compact alert line without replacing the full screen
+ * @param msg Alert text to print
+ * @param invert Clears the alert strip with the current screen background color
+ */
+void printAlertLine(String msg, bool invert);
 
 /**
  * @brief Fetches and displays weather data
@@ -332,9 +404,7 @@ void setup()
   {
     if (DEBUG_MODE)
       Serial.println(F("Error initialising BH1750"));
-    errMsg("Error BH1750");
-    while (1)
-      yield(); // Runs forever
+    addSystemAlert("BH1750 ERROR");
   }
   float lux = 0; // Light level in lux
   while (!lightMeter.measurementReady(true))
@@ -427,25 +497,28 @@ void setup()
   // if lux is 0, then the device is in dark mode and no need to initialize sensors
   if (lux != 0 || DEBUG_MODE == true)
   {
-    if (!rtc.begin())
+    RTC_READY = rtc.begin();
+    if (RTC_READY)
     {
       if (DEBUG_MODE)
-        Serial.println("Couldn't find RTC");
-      errMsg("Error RTC");
-      while (1)
-        ; // Runs forever
-    }
-    if (DEBUG_MODE)
-      Serial.println("RTC Ready");
-    DateTime now = rtc.now();
+        Serial.println("RTC Ready");
 
-    if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
-    { // reset high low at midnight
-      hTemp = 0.0;
-      lTemp = 60.0;
+      DateTime now = rtc.now();
+      if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < 15))
+      { // reset high low at midnight
+        hTemp = 0.0;
+        lTemp = 60.0;
+      }
+    }
+    else
+    {
+      if (DEBUG_MODE)
+        Serial.println("RTC unavailable; using 00:00 and placeholder date");
+      addSystemAlert("RTC ERROR");
     }
 
-    if (sensor.begin() == true) // Function to check if the TMP117 will correctly self-identify with the proper Device ID/Address
+    TMP117_READY = sensor.begin();
+    if (TMP117_READY) // Function to check if the TMP117 will correctly self-identify with the proper Device ID/Address
     {
       if (DEBUG_MODE)
         Serial.println("TMP117 Begin");
@@ -453,30 +526,29 @@ void setup()
     else
     {
       if (DEBUG_MODE)
-        Serial.println("Device failed to setup- Freezing code.");
-      errMsg("Error TMP117");
-      while (1)
-        ; // Runs forever
+        Serial.println("TMP117 unavailable; displaying -- for indoor temperature");
+      addSystemAlert("TMP117 ERROR");
     }
 
-    if (!bme.begin())
+    BME680_READY = bme.begin();
+    if (BME680_READY)
     {
       if (DEBUG_MODE)
-        Serial.println(F("Could not find a valid BME680 sensor, check wiring!"));
-      errMsg("Error BME680");
-      while (1)
-        ; // Runs forever
+        Serial.println("BME Ready");
+
+      // Set up oversampling and filter initialization for accurate readings
+      bme.setTemperatureOversampling(BME680_OS_2X);
+      bme.setHumidityOversampling(BME680_OS_16X);
+      bme.setPressureOversampling(BME680_OS_16X);
+      bme.setIIRFilterSize(BME680_FILTER_SIZE_7);
+      bme.setGasHeater(0, 0); // 320°C for 150 ms
     }
-
-    if (DEBUG_MODE)
-      Serial.println("BME Ready");
-
-    // Set up oversampling and filter initialization for accurate readings
-    bme.setTemperatureOversampling(BME680_OS_2X);
-    bme.setHumidityOversampling(BME680_OS_16X);
-    bme.setPressureOversampling(BME680_OS_16X);
-    bme.setIIRFilterSize(BME680_FILTER_SIZE_7);
-    bme.setGasHeater(0, 0); // 320°C for 150 ms
+    else
+    {
+      if (DEBUG_MODE)
+        Serial.println(F("BME680 unavailable; displaying -- for humidity and pressure"));
+      addSystemAlert("BME680 ERROR");
+    }
 
     if (!BATTERY_CRITICAL) // Connect to Wi-Fi network with SSID and password if battery is not critical
     {
@@ -487,7 +559,7 @@ void setup()
       while (WiFi.waitForConnectResult() != WL_CONNECTED)
       {
         if (DEBUG_MODE)
-          Serial.println("Connection Failed");
+          Serial.println("WiFi connection failed");
         break;
       }
 
@@ -499,43 +571,50 @@ void setup()
           Serial.println(WiFi.localIP());
         }
 
-        // Get the current day
-        if (!pref.isKey("timeNeedsUpdate")) // create key:value pairs
-          pref.putBool("timeNeedsUpdate", true);
-        bool timeNeedsUpdate = pref.getBool("timeNeedsUpdate", false);
-
-        DateTime now = rtc.now();
-        if ((now.year() == 1970) || rtc.lostPower()) // if RTC lost power or not set
-          timeNeedsUpdate = true;
-
-        // Get the current day
-        byte currentDay = now.day();
-
-        // Check if we need to update time (every 15 days)
-        if (!pref.isKey("lastCheckedDay")) // create key:value pairs
-          pref.putUChar("lastCheckedDay", 0);
-        byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
-        byte daysPassed = (currentDay - lastCheckedDay + 31) % 31;
-
-        if ((daysPassed >= 15) || timeNeedsUpdate) // check if 15 days passed or force update
+        if (RTC_READY)
         {
-          Serial.println("Updating time from NTP server");
-          if (autoTimeUpdate()) // Update time from NTP server
+          // Get the current day
+          if (!pref.isKey("timeNeedsUpdate")) // create key:value pairs
+            pref.putBool("timeNeedsUpdate", true);
+          bool timeNeedsUpdate = pref.getBool("timeNeedsUpdate", false);
+
+          DateTime now = rtc.now();
+          if ((now.year() == 1970) || rtc.lostPower()) // if RTC lost power or not set
+            timeNeedsUpdate = true;
+
+          // Get the current day
+          byte currentDay = now.day();
+
+          // Check if we need to update time (every 15 days)
+          if (!pref.isKey("lastCheckedDay")) // create key:value pairs
+            pref.putUChar("lastCheckedDay", 0);
+          byte lastCheckedDay = pref.getUChar("lastCheckedDay", 0);
+          byte daysPassed = (currentDay - lastCheckedDay + 31) % 31;
+
+          if ((daysPassed >= 15) || timeNeedsUpdate) // check if 15 days passed or force update
           {
-            if (DEBUG_MODE)
-              Serial.println("Time Updated");
-            timeNeedsUpdate = false;
+            Serial.println("RTC sync needed; updating time from NTP server");
+            if (autoTimeUpdate()) // Update time from NTP server
+            {
+              if (DEBUG_MODE)
+                Serial.println("RTC sync succeeded");
+              timeNeedsUpdate = false;
+            }
+            else
+            {
+              if (DEBUG_MODE)
+                Serial.println("RTC sync failed");
+            }
+            pref.putBool("timeNeedsUpdate", timeNeedsUpdate);
+            pref.putUChar("lastCheckedDay", currentDay); // Update last checked day
           }
           else
-          {
-            if (DEBUG_MODE)
-              Serial.println("Time Update Failed");
-          }
-          pref.putBool("timeNeedsUpdate", timeNeedsUpdate);
-          pref.putUChar("lastCheckedDay", currentDay); // Update last checked day
+            Serial.println("RTC sync not required");
         }
-        else
-          Serial.println("Time Update Not Required");
+        else if (DEBUG_MODE)
+        {
+          Serial.println("RTC unavailable, skipping RTC time sync");
+        }
 
         // Check if the API keys are saved in the preferences
         if (!pref.isKey("api")) // create key:value pairs
@@ -584,7 +663,7 @@ void setup()
       {
         ++bootCount; // increment the boot counter
         if (DEBUG_MODE)
-          Serial.println("Time And Weather");
+          Serial.println("Drawing online time and weather screen");
         if (bootCount == ghostProtek)
         {
           display.fillScreen(GxEPD_BLACK);
@@ -600,7 +679,7 @@ void setup()
         if (bootCount == ghostProtek) // reset boot counter after ghost protection
           bootCount = 0;
         if (DEBUG_MODE)
-          Serial.println("Time And Weather Done");
+          Serial.println("Online time and weather screen drawn");
         // Turn off WiFi as soon as possible
         turnOffWifi();
       }
@@ -608,11 +687,11 @@ void setup()
       {
         display.fillScreen(GxEPD_WHITE);
         if (DEBUG_MODE)
-          Serial.println("Time Only");
+          Serial.println("Drawing offline time screen");
         display.drawBitmap(333, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
         offlineTimePrint();                                       // offset for wifi off which shifts the temperature display to the middle
         if (DEBUG_MODE)
-          Serial.println("Time Done");
+          Serial.println("Offline time screen drawn");
         if (BATTERY_CRITICAL)
           TIME_TO_SLEEP = 1800; // 30 min sleep time when battery is critical (POWER SAVER MODE)
       }
@@ -622,16 +701,15 @@ void setup()
   }
 
   if (DEBUG_MODE)
-    Serial.println("Data Write");
+    Serial.println("Closing preferences and I2C");
 
   pref.end(); // Close the preferences
   Wire.end(); // End I2C communication
 
   if (DEBUG_MODE)
   {
-    Serial.println("Data Write Done");
-    Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP / 60) + " Mins");
-    Serial.println("Going to sleep now");
+    Serial.println("Preferences closed; I2C stopped");
+    Serial.println("Configured sleep interval: " + String(TIME_TO_SLEEP / 60) + " min");
     Serial.flush(); // Flush the serial buffer
     delay(5);
   }
@@ -642,7 +720,7 @@ void setup()
     // esp_deep_sleep_start();                                        // Enter deep sleep
   }
   else
-    Serial.println("Going to loop");
+    Serial.println("DEBUG_MODE active: staying awake and entering loop");
 }
 
 /**
@@ -666,7 +744,7 @@ void loop()
   if ((millis() - lastTime1) > timerDelay1)
   {
     Serial.println("In LOOP");
-    // errMsg("DEBUG MODE"); // Display debug message
+    // addSystemAlert("DEBUG MODE"); // Display debug message
     //  Additional debug functions can be added here
     lastTime1 = millis();
   }
@@ -740,14 +818,41 @@ bool checkHttpResponse(const char *source)
 
 /**
  * @brief Prints temperature and environmental data when WiFi is connected
- * @param offset Vertical offset for display positioning (default: 0)
- * @param invert Inverts colors for ghost protection (default: false)
+ * @param invert Inverts colors for ghost protection
+ *
+ * Layout groups:
+ * 1. Sensor/cache refresh
+ * 2. Header: battery, status, update time
+ * 3. Main panel: date and indoor temperature
+ * 4. Footer strip: humidity, pressure, high/low temperature
  */
 void onlineTimePrint(bool invert)
 {
   if (DEBUG_MODE)
     Serial.println("Online Time Print");
-  // Configure fonts and colors once at the start
+
+  //=============== 1. SENSOR AND STATE REFRESH ===============
+  float tempC = 0;
+  bool tempReady = TMP117_READY && sensor.dataReady();
+  if (tempReady)
+  {
+    tempC = sensor.readTempC();
+    hTemp = max(hTemp, tempC);
+    lTemp = min(lTemp, tempC);
+  }
+
+  float newBattLevel = batteryLevel();
+  bool acceptBatteryRise = ((newBattLevel - battLevel) >= battChangeThreshold) || (newBattLevel > battHigh);
+  if (newBattLevel < battLevel || acceptBatteryRise)
+    battLevel = newBattLevel;
+
+  int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
+  BATTERY_CRITICAL = percent < critBattPercent;
+
+  // Start BME680 sampling early so display drawing hides part of the wait.
+  bool bmeStarted = BME680_READY && bme.beginReading();
+
+  //=============== 2. DISPLAY STYLE ===============
   uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
   uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
   uint16_t lineColor = (BATTERY_CRITICAL || invert) ? GxEPD_WHITE : GxEPD_RED;
@@ -757,100 +862,101 @@ void onlineTimePrint(bool invert)
   u8g2Fonts.setForegroundColor(fg);
   u8g2Fonts.setBackgroundColor(bg);
 
-  // Temperature reading
-  float tempC = 0;
-  if (sensor.dataReady())
-  {
-    tempC = sensor.readTempC();
-    hTemp = max(hTemp, tempC);
-    lTemp = min(lTemp, tempC);
-  }
-
-  // Battery level handling
-  float newBattLevel = batteryLevel();
-  battLevel = (newBattLevel < battLevel) ? newBattLevel : ((newBattLevel - battLevel) >= battChangeThreshold || newBattLevel > battHigh) ? newBattLevel
-                                                                                                                                         : battLevel;
-
-  // Battery display section
+  //=============== 3. HEADER: BATTERY AND UPDATE TIME ===============
   u8g2Fonts.setFont(u8g2_font_luRS08_tf);
   u8g2Fonts.setCursor(28, 11);
   u8g2Fonts.print(battLevel, 2);
   u8g2Fonts.print("V");
 
-  int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
-  BATTERY_CRITICAL = percent < critBattPercent;
-
   u8g2Fonts.setCursor(63, 11);
-  if (!BATTERY_CRITICAL)
+  u8g2Fonts.print(percent);
+  u8g2Fonts.print("%");
+  if (invert)
   {
-    u8g2Fonts.print(percent, 1);
-    u8g2Fonts.print("%");
-    if (invert)
-    {
-      u8g2Fonts.setCursor(123, 11);
-      u8g2Fonts.print(" GHOSTING PROTECTION");
-    }
-  }
-  else
-  {
-    u8g2Fonts.print("BATTERY CRITICAL, WIFI TURNED OFF");
+    u8g2Fonts.setCursor(123, 11);
+    u8g2Fonts.print(" GHOSTING PROTECTION");
   }
   iconBattery(display, percent, invert);
 
-  // Time and date display
-  DateTime now = rtc.now();
+  byte currentHour = 0;
+  byte currentMinute = 0;
+  byte currentDay = 0;
+  byte currentMonth = 0;
+  byte currentDayOfWeek = 0;
+
+  if (RTC_READY)
+  {
+    DateTime now = rtc.now();
+    currentHour = now.hour();
+    currentMinute = now.minute();
+    currentDay = now.day();
+    currentMonth = now.month();
+    currentDayOfWeek = now.dayOfTheWeek();
+  }
+
   char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+  snprintf(timeStr, sizeof(timeStr), "%02d:%02d", currentHour, currentMinute);
 
   u8g2Fonts.setCursor(295, 11);
-  // u8g2Fonts.print("Last Update: "); //to be corrected later, overlapping with battery icon
   u8g2Fonts.print(timeStr);
 
+  //=============== 4. MAIN PANEL: DATE AND INDOOR TEMP ===============
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(10, 75);
-  u8g2Fonts.print(now.day() < 10 ? "0" : "");
-  u8g2Fonts.print(now.day());
-  u8g2Fonts.print(", ");
-  u8g2Fonts.print(monthName[now.month() - 1]);
-  u8g2Fonts.setCursor(10, 105);
-  u8g2Fonts.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  if (RTC_READY)
+  {
+    if (currentDay < 10)
+      u8g2Fonts.print("0");
+    u8g2Fonts.print(currentDay);
+    u8g2Fonts.print(", ");
+    u8g2Fonts.print(monthName[currentMonth - 1]);
+  }
+  else
+    u8g2Fonts.print("--, ---");
 
-  // Main temperature display
+  u8g2Fonts.setCursor(10, 105);
+  u8g2Fonts.print(RTC_READY ? daysOfTheWeek[currentDayOfWeek] : "---");
+
   u8g2Fonts.setFont(u8g2_font_inb19_mf);
   u8g2Fonts.setCursor(320, 60);
   u8g2Fonts.print("o");
 
   u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
   u8g2Fonts.setCursor(150, 110);
-  u8g2Fonts.print(String(tempC));
+  if (tempReady)
+    u8g2Fonts.print(tempC);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.setCursor(330, 110);
   u8g2Fonts.print("C");
 
-  // Draw separator lines
-  for (int i = 0; i < 2; i++)
-  {
-    display.fillRect(0, 121 + (i * 33), 400, 2, lineColor);
-  }
+  display.fillRect(0, 121, 400, 2, lineColor);
+  display.fillRect(0, 154, 400, 2, lineColor);
 
-  // Environmental readings
-  if (!bme.beginReading() || !bme.endReading())
+  //=============== 5. FOOTER STRIP: ENVIRONMENT AND HIGH/LOW ===============
+  bool bmeReady = bmeStarted && bme.endReading();
+  if (BME680_READY && !bmeReady)
   {
     if (DEBUG_MODE)
       Serial.println("BME READING ERROR");
-    return;
+    addSystemAlert("BME680 READ");
   }
 
-  // Display environmental data
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(2, 150);
-  u8g2Fonts.print(bme.humidity);
+  if (bmeReady)
+    u8g2Fonts.print(bme.humidity);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.print("%");
 
   u8g2Fonts.setCursor(264, 150);
-  u8g2Fonts.print(bme.pressure / 100.0);
+  if (bmeReady)
+    u8g2Fonts.print(bme.pressure / 100.0);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.print("hPa");
 
-  // High/Low temperature display
   u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
   const char *labels[] = {"H:", "L:"};
   float temps[] = {hTemp, lTemp};
@@ -860,7 +966,10 @@ void onlineTimePrint(bool invert)
   {
     u8g2Fonts.setCursor(positions[i], 148);
     u8g2Fonts.print(labels[i]);
-    u8g2Fonts.print(temps[i]);
+    if (tempReady)
+      u8g2Fonts.print(temps[i]);
+    else
+      u8g2Fonts.print("--");
     u8g2Fonts.setFont(u8g2_font_fub11_tf);
     u8g2Fonts.setCursor(positions[i] + 63, 138);
     u8g2Fonts.print("o");
@@ -868,6 +977,9 @@ void onlineTimePrint(bool invert)
     u8g2Fonts.setCursor(positions[i] + 73, 148);
     u8g2Fonts.print("C");
   }
+
+  printAlertLine(currentAlertText(), invert);
+
   if (DEBUG_MODE)
     Serial.println("Online Time Print Done");
 }
@@ -880,7 +992,8 @@ void offlineTimePrint()
 {
   // Temperature reading
   float tempC = 0;
-  if (sensor.dataReady())
+  bool tempReady = TMP117_READY && sensor.dataReady();
+  if (tempReady)
   {
     tempC = sensor.readTempC();
     hTemp = max(hTemp, tempC);
@@ -919,7 +1032,7 @@ void offlineTimePrint()
   u8g2Fonts.setCursor(367, 11);
   if (battLevel < 4)
   {
-    u8g2Fonts.print(percent, 1);
+    u8g2Fonts.print(percent);
     u8g2Fonts.print("%");
   }
   else
@@ -928,36 +1041,56 @@ void offlineTimePrint()
     u8g2Fonts.print("USB");
   }
 
-  if (BATTERY_CRITICAL)
-  {
-    u8g2Fonts.setFont(u8g2_font_profont22_tf);
-    u8g2Fonts.setCursor(40, 292);
-    u8g2Fonts.print("BATTERY LOW, POWER-SAVER ON");
-  }
-
   iconBattery(display, percent);
 
   // Main temperature display
   u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
   u8g2Fonts.setCursor(100, 110);
-  u8g2Fonts.print(String(tempC));
+  if (tempReady)
+    u8g2Fonts.print(tempC);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.setCursor(280, 110);
   u8g2Fonts.print("C");
   u8g2Fonts.setFont(u8g2_font_inb19_mf);
   u8g2Fonts.setCursor(270, 60);
   u8g2Fonts.print("o");
 
-  DateTime now = rtc.now();
+  byte currentHour = 0;
+  byte currentMinute = 0;
+  byte currentDay = 0;
+  byte currentMonth = 0;
+  byte currentDayOfWeek = 0;
+  uint16_t currentYear = 0;
+
+  if (RTC_READY)
+  {
+    DateTime now = rtc.now();
+    currentHour = now.hour();
+    currentMinute = now.minute();
+    currentDay = now.day();
+    currentMonth = now.month();
+    currentYear = now.year();
+    currentDayOfWeek = now.dayOfTheWeek();
+  }
+
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(10, 150);
-  u8g2Fonts.print(now.day() < 10 ? "0" : "");
-  u8g2Fonts.print(now.day());
-  u8g2Fonts.print("/");
-  u8g2Fonts.print(fullMonthName[now.month() - 1]);
-  u8g2Fonts.print("/");
-  u8g2Fonts.print(now.year());
+  if (RTC_READY)
+  {
+    if (currentDay < 10)
+      u8g2Fonts.print("0");
+    u8g2Fonts.print(currentDay);
+    u8g2Fonts.print("/");
+    u8g2Fonts.print(fullMonthName[currentMonth - 1]);
+    u8g2Fonts.print("/");
+    u8g2Fonts.print(currentYear);
+  }
+  else
+    u8g2Fonts.print("--/--/----");
+
   u8g2Fonts.setCursor(270, 150);
-  u8g2Fonts.print(fullDaysOfTheWeek[now.dayOfTheWeek()]);
+  u8g2Fonts.print(RTC_READY ? fullDaysOfTheWeek[currentDayOfWeek] : "---");
 
   if (!BATTERY_CRITICAL)
   {
@@ -974,18 +1107,22 @@ void offlineTimePrint()
     display.fillRect(397, 160, 3, 100, lineColor); // vertical line last
   }
   // Environmental readings
-  if (!bme.beginReading() || !bme.endReading())
+  bool bmeReady = BME680_READY && bme.beginReading() && bme.endReading();
+  if (BME680_READY && !bmeReady)
   {
     if (DEBUG_MODE)
       Serial.println("BME READING ERROR");
-    return;
+    addSystemAlert("BME680 READ");
   }
 
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   float temps[] = {hTemp, lTemp};
   u8g2Fonts.setCursor(6, 200);
   u8g2Fonts.print("HIGH:");
-  u8g2Fonts.print(temps[0]);
+  if (tempReady)
+    u8g2Fonts.print(temps[0]);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.setFont(u8g2_font_fub11_tf);
   u8g2Fonts.setCursor(124, 185);
   u8g2Fonts.print("o");
@@ -995,7 +1132,10 @@ void offlineTimePrint()
 
   u8g2Fonts.setCursor(6, 240);
   u8g2Fonts.print("LOW:");
-  u8g2Fonts.print(temps[1]);
+  if (tempReady)
+    u8g2Fonts.print(temps[1]);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.setFont(u8g2_font_fub11_tf);
   u8g2Fonts.setCursor(116, 225);
   u8g2Fonts.print("o");
@@ -1008,25 +1148,76 @@ void offlineTimePrint()
 
   display.drawBitmap(155, 174, humiIcon, 32, 32, fg);
   u8g2Fonts.setCursor(188, 200);
-  u8g2Fonts.print(bme.humidity);
+  if (bmeReady)
+    u8g2Fonts.print(bme.humidity);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.print("%");
 
   // Draw gauge icon for pressure
   display.drawBitmap(155, 214, gaugeIcon, 32, 32, fg);
   u8g2Fonts.setCursor(188, 240);
-  u8g2Fonts.print(bme.pressure / 100.0);
+  if (bmeReady)
+    u8g2Fonts.print(bme.pressure / 100.0);
+  else
+    u8g2Fonts.print("--");
   u8g2Fonts.setFont(u8g2_font_6x13_tf);
   u8g2Fonts.print("hPa");
 
   // Last update time
   char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+  snprintf(timeStr, sizeof(timeStr), "%02d:%02d", currentHour, currentMinute);
   u8g2Fonts.setFont(u8g2_font_8x13_tf);
   u8g2Fonts.setCursor(306, 190);
   u8g2Fonts.print("Last Update");
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(319, 240);
   u8g2Fonts.print(timeStr);
+
+  printAlertLine(currentAlertText(), false);
+}
+
+/**
+ * @brief Draws the OpenWeather icon code on the weather panel
+ * @param icon OpenWeather icon code
+ * @param invert Inverts display colors for ghost protection
+ */
+void drawCurrentWeatherIcon(const char *icon, bool invert)
+{
+  if (strcmp(icon, "01d") == 0)
+    iconSun(display, 361, 189, 15, invert);
+  else if (strcmp(icon, "01n") == 0)
+    iconMoon(display, 361, 189, 15, invert);
+  else if (strcmp(icon, "02d") == 0)
+    iconCloudyDay(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "02n") == 0)
+    iconCloudyNight(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "03d") == 0 || strcmp(icon, "03n") == 0)
+    iconCloud(display, 361, 189, 15, invert);
+  else if (strcmp(icon, "04d") == 0 || strcmp(icon, "04n") == 0)
+    iconCloudy(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "09d") == 0 || strcmp(icon, "09n") == 0)
+    iconSleet(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "10d") == 0 || strcmp(icon, "10n") == 0)
+    iconRain(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "11d") == 0 || strcmp(icon, "11n") == 0)
+    iconThunderstorm(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "13d") == 0 || strcmp(icon, "13n") == 0)
+    iconSnow(display, 330, 160, 60, invert);
+  else if (strcmp(icon, "50d") == 0 || strcmp(icon, "50n") == 0)
+    iconFog(display, 330, 160, 60, invert);
+}
+
+void printUvRisk(float uv)
+{
+  if (uv < 2)
+    u8g2Fonts.print(" Low");
+  else if (uv < 5)
+    u8g2Fonts.print(" Medium");
+  else if (uv <= 7)
+    u8g2Fonts.print(" High");
+  else
+    u8g2Fonts.print(" Danger");
 }
 
 /**
@@ -1040,216 +1231,172 @@ void weatherPrint(bool invert)
   uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
   uint16_t red = invert ? GxEPD_WHITE : GxEPD_RED;
 
-  char serverPath[256]; // Buffer for API URL
-  strcpy(serverPath, OPEN_WEATHER_BASE_URL);
-  strcat(serverPath, lat.c_str());
-  strcat(serverPath, "&lon=");
-  strcat(serverPath, lon.c_str());
-  strcat(serverPath, OPEN_WEATHER_PARAMS);
-  strcat(serverPath, openWeatherMapApiKey.c_str());
+  char serverPath[256];
+  int urlLength = snprintf(serverPath, sizeof(serverPath), "%s%s&lon=%s%s%s",
+                           OPEN_WEATHER_BASE_URL,
+                           lat.c_str(),
+                           lon.c_str(),
+                           OPEN_WEATHER_PARAMS,
+                           openWeatherMapApiKey.c_str());
+  if (urlLength < 0 || urlLength >= int(sizeof(serverPath)))
+  {
+    if (DEBUG_MODE)
+      Serial.println("OpenWeather URL too long");
+    networkInfo("OpenWeather URL");
+    return;
+  }
 
   jsonBuffer = weatherDataAPI(serverPath);
   if (!checkHttpResponse("OpenWeather"))
     return;
   if (DEBUG_MODE)
     Serial.println(jsonBuffer);
-  JsonDocument myObject;
-  deserializeJson(myObject, jsonBuffer);
 
-  // Check if parsing was successful
-  if (myObject.isNull())
+  JsonDocument myObject;
+  DeserializationError error = deserializeJson(myObject, jsonBuffer);
+
+  if (error)
   {
     if (DEBUG_MODE)
-      Serial.println("Parsing input failed!");
+      Serial.println("OpenWeather JSON parse failed: " + String(error.c_str()));
     ESP.restart();
     return;
   }
 
-  // Override with custom weather URL
-  strcpy(serverPath, CUSTOM_WEATHER_BASE_URL);
-  strcat(serverPath, customApiKey.c_str());
+  urlLength = snprintf(serverPath, sizeof(serverPath), "%s%s",
+                       CUSTOM_WEATHER_BASE_URL,
+                       customApiKey.c_str());
+  if (urlLength < 0 || urlLength >= int(sizeof(serverPath)))
+  {
+    if (DEBUG_MODE)
+      Serial.println("Custom weather URL too long");
+    networkInfo("Custom URL");
+    return;
+  }
+
   jsonBuffer = weatherDataAPI(serverPath);
   if (!checkHttpResponse("Custom"))
     return;
   if (DEBUG_MODE)
     Serial.println(jsonBuffer);
-  JsonDocument customObject;
-  deserializeJson(customObject, jsonBuffer);
 
-  // Check if parsing was successful
-  if (customObject.isNull())
+  JsonDocument customObject;
+  error = deserializeJson(customObject, jsonBuffer);
+
+  if (error)
   {
     if (DEBUG_MODE)
-      Serial.println("Parsing input failed!");
+      Serial.println("Custom weather JSON parse failed: " + String(error.c_str()));
     ESP.restart();
     return;
   }
 
-  if (myObject["current"]["temp"].isNull())
-    networkInfo();
-  else
+  if (myObject["current"]["temp"].isNull() || customObject["data"]["temp"].isNull())
   {
+    networkInfo();
+    return;
+  }
 
-    wifiStatus(invert);
-    u8g2Fonts.setFontMode(1);
-    u8g2Fonts.setFontDirection(0);
-    u8g2Fonts.setForegroundColor(fg);
-    u8g2Fonts.setBackgroundColor(bg);
+  wifiStatus(invert);
+  u8g2Fonts.setFontMode(1);
+  u8g2Fonts.setFontDirection(0);
+  u8g2Fonts.setForegroundColor(fg);
+  u8g2Fonts.setBackgroundColor(bg);
 
-    u8g2Fonts.setFont(u8g2_font_helvB10_tf);
-    u8g2Fonts.setCursor(29, 170);
-    u8g2Fonts.print("OUTDOOR");
-    u8g2Fonts.setFont(u8g2_font_fub20_tf); // u8g2_font_fub30_tf
-    uint16_t width;
-    width = u8g2Fonts.getUTF8Width(String(customObject["data"]["temp"].as<float>()).c_str());
-    u8g2Fonts.setCursor(20, 200); // start writing at this position
-    u8g2Fonts.print(customObject["data"]["temp"].as<float>());
-    u8g2Fonts.setCursor(30 + width, 200);
-    u8g2Fonts.print("C");
-    u8g2Fonts.setFont(u8g2_font_fub11_tf);
-    u8g2Fonts.setCursor(22 + width, 185); // start writing at this position
-    u8g2Fonts.print("o");
+  u8g2Fonts.setFont(u8g2_font_helvB10_tf);
+  u8g2Fonts.setCursor(29, 170);
+  u8g2Fonts.print("OUTDOOR");
 
-    u8g2Fonts.setFont(u8g2_font_fur11_tf); // u8g2_font_fur14_tf
-    width = u8g2Fonts.getUTF8Width(("Real Feel:" + String(myObject["current"]["feels_like"].as<float>())).c_str());
-    u8g2Fonts.setCursor(5, 220); // start writing at this position
-    u8g2Fonts.print("Real Feel:");
-    u8g2Fonts.setCursor(75, 220);
-    u8g2Fonts.print(myObject["current"]["feels_like"].as<float>());
-    u8g2Fonts.setCursor(width + 16, 220);
-    u8g2Fonts.print(String("C"));
-    u8g2Fonts.setFont(u8g2_font_baby_tf); // u8g2_font_robot_de_niro_tf
-    u8g2Fonts.setCursor(13 + width, 211); // start writing at this position
-    u8g2Fonts.print("o");
+  float outdoorTemp = customObject["data"]["temp"].as<float>();
+  float feelsLike = myObject["current"]["feels_like"].as<float>();
 
-    u8g2Fonts.setFont(u8g2_font_fur14_tf);
-    u8g2Fonts.setCursor(5, 245); // start writing at this position
-    u8g2Fonts.print(customObject["data"]["humidity"].as<float>());
-    u8g2Fonts.print(String("%"));
+  u8g2Fonts.setFont(u8g2_font_fub20_tf);
+  uint16_t width = u8g2Fonts.getUTF8Width(String(outdoorTemp).c_str());
+  u8g2Fonts.setCursor(20, 200);
+  u8g2Fonts.print(outdoorTemp);
+  u8g2Fonts.setCursor(30 + width, 200);
+  u8g2Fonts.print("C");
+  u8g2Fonts.setFont(u8g2_font_fub11_tf);
+  u8g2Fonts.setCursor(22 + width, 185);
+  u8g2Fonts.print("o");
 
-    u8g2Fonts.setCursor(5, 270); // start writing at this position
-    u8g2Fonts.print(customObject["data"]["pressure"].as<float>());
-    u8g2Fonts.print(String("hPa"));
-    u8g2Fonts.setFont(u8g2_font_helvB10_tf);
-    u8g2Fonts.setCursor(5, 294); // start writing at this position
-    u8g2Fonts.print("UVI: ");
-    u8g2Fonts.print(myObject["current"]["uvi"].as<float>());
-    u8g2Fonts.setFont(u8g2_font_fur11_tf);
-    double uv = double(myObject["current"]["uvi"].as<float>());
-    if (uv < 2)
-      u8g2Fonts.print(" Low");
-    else if (uv < 5)
-      u8g2Fonts.print(" Medium");
-    else if (uv <= 7)
-      u8g2Fonts.print(" High");
-    else if (uv > 7)
-      u8g2Fonts.print(" Danger");
+  u8g2Fonts.setFont(u8g2_font_fur11_tf);
+  String feelsLikeText = "Real Feel:" + String(feelsLike);
+  width = u8g2Fonts.getUTF8Width(feelsLikeText.c_str());
+  u8g2Fonts.setCursor(5, 220);
+  u8g2Fonts.print("Real Feel:");
+  u8g2Fonts.setCursor(75, 220);
+  u8g2Fonts.print(feelsLike);
+  u8g2Fonts.setCursor(width + 16, 220);
+  u8g2Fonts.print("C");
+  u8g2Fonts.setFont(u8g2_font_baby_tf);
+  u8g2Fonts.setCursor(13 + width, 211);
+  u8g2Fonts.print("o");
 
-    // Draw vertical divider line
-    display.fillRect(136, 155, 2, 144, red); // 144 = 299-155
+  u8g2Fonts.setFont(u8g2_font_fur14_tf);
+  u8g2Fonts.setCursor(5, 245);
+  u8g2Fonts.print(customObject["data"]["humidity"].as<float>());
+  u8g2Fonts.print("%");
 
-    // Sunset sunrise print
-    char timeBuffer[6];
-    for (int i = 0; i < 2; i++)
+  u8g2Fonts.setCursor(5, 270);
+  u8g2Fonts.print(customObject["data"]["pressure"].as<float>());
+  u8g2Fonts.print("hPa");
+
+  u8g2Fonts.setFont(u8g2_font_helvB10_tf);
+  u8g2Fonts.setCursor(5, 294);
+  u8g2Fonts.print("UVI: ");
+  float uv = myObject["current"]["uvi"].as<float>();
+  u8g2Fonts.print(uv);
+  u8g2Fonts.setFont(u8g2_font_fur11_tf);
+  printUvRisk(uv);
+
+  display.fillRect(136, 155, 2, 144, red);
+
+  char timeBuffer[6];
+  for (int i = 0; i < 2; i++)
+  {
+    const char *key = (i == 0) ? "sunrise" : "sunset";
+    time_t t = myObject["current"][key] | 0;
+    if (t > 0)
     {
-      const char *key = (i == 0) ? "sunrise" : "sunset";
-      time_t t = myObject["current"][key] | 0;
-      if (t > 0)
-      {
-        setTime(t);
-        adjustTime(19800); // UTC+5:30 offset
-
-        // Format time as HH:MM
-        snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", hour(), minute());
-        // Draw icon and time
-        iconSunRise(display, i == 0 ? 152 : 267, 170, i == 0, invert);
-        u8g2Fonts.setCursor(i == 0 ? 166 : 281, 175);
-        u8g2Fonts.print(timeBuffer);
-      }
-    }
-
-    // Vertical divider line
-    display.fillRect(320, 155, 2, 144, red); // 144 = 299-155
-    // Horizontal divider line
-    display.fillRect(320, 230, 80, 2, red); // 80 = 400-320
-
-    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"].as<float>()), invert);
-    u8g2Fonts.setFont(u8g2_font_luRS08_tf);
-    u8g2Fonts.setCursor(330, 297);
-    u8g2Fonts.print("Moon Phase");
-
-    String s = myObject["current"]["weather"][0]["icon"] | "";
-
-    if (s == "01d")
-    { // Clear Day
-      iconSun(display, 361, 189, 15, invert);
-    }
-    else if (s == "01n") // Clear Night
-      iconMoon(display, 361, 189, 15, invert);
-    else if (s == "02d") // few clouds
-      iconCloudyDay(display, 330, 160, 60, invert);
-    else if (s == "02n")
-      iconCloudyNight(display, 330, 160, 60, invert);
-    else if (s == "03d") // scattered clouds
-      iconCloud(display, 361, 189, 15, invert);
-    else if (s == "03n")
-      iconCloud(display, 361, 189, 15, invert);
-    else if (s == "04d") // broken clouds (two clouds)
-      iconCloudy(display, 330, 160, 60, invert);
-    else if (s == "04n")
-      iconCloudy(display, 330, 160, 60, invert);
-    else if (s == "09d") // shower rain
-      iconSleet(display, 330, 160, 60, invert);
-    else if (s == "09n")
-      iconSleet(display, 330, 160, 60, invert);
-    else if (s == "10d") // snow
-      iconRain(display, 330, 160, 60, invert);
-    else if (s == "10n")
-      iconRain(display, 330, 160, 60, invert);
-    else if (s == "11d") // thunderstorm
-      iconThunderstorm(display, 330, 160, 60, invert);
-    else if (s == "11n")
-      iconThunderstorm(display, 330, 160, 60, invert);
-    else if (s == "13d") // snow
-      iconSnow(display, 330, 160, 60, invert);
-    else if (s == "13n")
-      iconSnow(display, 330, 160, 60, invert);
-    else if (s == "50d") // mist
-      iconFog(display, 330, 160, 60, invert);
-    else if (s == "50n")
-      iconFog(display, 330, 160, 60, invert);
-
-    u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
-    s = myObject["current"]["weather"][0]["main"] | "";
-
-    u8g2Fonts.setCursor(330, 227);
-    u8g2Fonts.print(s);
-
-    // u8g2Fonts.setCursor(186, 200);
-    if (myObject.containsKey("alerts") && myObject["alerts"].size() > 0)
-    {
-
-      String alert = myObject["alerts"][0]["event"] | "";
-
-      if (alert.length() > 0)
-      {
-
-        Serial.println("Alert: " + alert);
-
-        int16_t tbx, tby;
-        uint16_t tbw, tbh;
-
-        String text = "Alerts: " + alert;
-
-        display.getTextBounds(text, 0, 0, &tbx, &tby, &tbw, &tbh);
-
-        uint16_t x = ((display.width() - tbw) / 2) - tbx;
-
-        u8g2Fonts.setCursor(x, 25);
-        u8g2Fonts.print(text);
-      }
+      setTime(t);
+      adjustTime(19800);
+      snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", hour(), minute());
+      iconSunRise(display, i == 0 ? 152 : 267, 170, i == 0, invert);
+      u8g2Fonts.setCursor(i == 0 ? 166 : 281, 175);
+      u8g2Fonts.print(timeBuffer);
     }
   }
+
+  display.fillRect(320, 155, 2, 144, red);
+  display.fillRect(320, 230, 80, 2, red);
+
+  iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"].as<float>()), invert);
+  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+  u8g2Fonts.setCursor(330, 297);
+  u8g2Fonts.print("Moon Phase");
+
+  drawCurrentWeatherIcon(myObject["current"]["weather"][0]["icon"] | "", invert);
+
+  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+  u8g2Fonts.setCursor(330, 227);
+  u8g2Fonts.print(myObject["current"]["weather"][0]["main"] | "");
+
+  String alertText = currentAlertText();
+  if (myObject.containsKey("alerts") && myObject["alerts"].size() > 0)
+  {
+    String weatherAlert = myObject["alerts"][0]["event"] | "";
+    if (weatherAlert.length() > 0)
+    {
+      if (DEBUG_MODE)
+        Serial.println("Alert: " + weatherAlert);
+
+      if (alertText.length() > 0)
+        alertText += " | ";
+      alertText += weatherAlert;
+    }
+  }
+  printAlertLine(alertText, invert);
 }
 
 //=============== UI HELPER FUNCTIONS ===============
@@ -1303,28 +1450,12 @@ void wifiStatus(bool invert)
 }
 
 /**
- * @brief Prints Alert icon and the passed message all over the screen. Implement a infinite while loop after calling this function
+ * @brief Adds an error to the compact alert line without stopping the clock
+ * @note Kept as a compatibility wrapper for older call sites.
  */
 void errMsg(String msg)
 {
-  display.setRotation(0);
-  display.setFont(&FreeMonoBold9pt7b);
-  display.setTextColor(GxEPD_BLACK);
-  int16_t tbx, tby;
-  uint16_t tbw, tbh;
-  display.getTextBounds(msg, 0, 0, &tbx, &tby, &tbw, &tbh);
-  // center the bounding box by transposition of the origin:
-  uint16_t x = ((display.width() - tbw) / 2) - tbx;
-  uint16_t y = ((display.height() - tbh) / 2) - tby;
-  display.setFullWindow();
-  display.firstPage();
-  do
-  {
-    display.fillScreen(GxEPD_WHITE);
-    display.drawInvertedBitmap(151, 40, alert, 100, 90, GxEPD_BLACK);
-    display.setCursor(x, y);
-    display.print(msg);
-  } while (display.nextPage());
+  addSystemAlert(msg.c_str());
 }
 
 /**
