@@ -156,21 +156,6 @@ const char *PARAM_INPUT_2 = "pass";
 //=============== HELPER FUNCTIONS ===============
 
 /**
- * @brief Blinks LED to indicate errors
- */
-void errLeds(void)
-{
-  if (DEBUG_PIN != LED_BUILTIN) // Only set pin if not already used
-  {
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(100);
-  }
-}
-
-/**
  * @brief Measures battery voltage with averaging
  * @return float Averaged battery voltage in volts
  * @note Uses voltage divider with 1MΩ resistor and 104 capacitor
@@ -318,8 +303,8 @@ void setup()
   setCpuFrequencyMhz(20); // Set CPU to 20MHz
   pinMode(BATPIN, INPUT);
   pinMode(DEBUG_PIN, INPUT);
-  if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
-    DEBUG_MODE = true;
+  // if (digitalRead(DEBUG_PIN) == 1) // Check if debug mode is enabled
+  DEBUG_MODE = true;
   if (DEBUG_MODE)
   {
     Serial.begin(115200);
@@ -487,9 +472,9 @@ void setup()
       Serial.println("BME Ready");
 
     // Set up oversampling and filter initialization for accurate readings
-    bme.setTemperatureOversampling(BME680_OS_8X);
-    bme.setHumidityOversampling(BME680_OS_8X);
-    bme.setPressureOversampling(BME680_OS_8X);
+    bme.setTemperatureOversampling(BME680_OS_2X);
+    bme.setHumidityOversampling(BME680_OS_16X);
+    bme.setPressureOversampling(BME680_OS_16X);
     bme.setIIRFilterSize(BME680_FILTER_SIZE_7);
     bme.setGasHeater(0, 0); // 320°C for 150 ms
 
@@ -654,7 +639,7 @@ void setup()
   if (!DEBUG_MODE) // if debug mode is off, then go to deep sleep
   {
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // Set the sleep time
-    esp_deep_sleep_start();                                        // Enter deep sleep
+    // esp_deep_sleep_start();                                        // Enter deep sleep
   }
   else
     Serial.println("Going to loop");
@@ -760,6 +745,8 @@ bool checkHttpResponse(const char *source)
  */
 void onlineTimePrint(bool invert)
 {
+  if (DEBUG_MODE)
+    Serial.println("Online Time Print");
   // Configure fonts and colors once at the start
   uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
   uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
@@ -881,6 +868,8 @@ void onlineTimePrint(bool invert)
     u8g2Fonts.setCursor(positions[i] + 73, 148);
     u8g2Fonts.print("C");
   }
+  if (DEBUG_MODE)
+    Serial.println("Online Time Print Done");
 }
 
 /**
@@ -1100,6 +1089,7 @@ void weatherPrint(bool invert)
     networkInfo();
   else
   {
+
     wifiStatus(invert);
     u8g2Fonts.setFontMode(1);
     u8g2Fonts.setFontDirection(0);
@@ -1162,7 +1152,8 @@ void weatherPrint(bool invert)
     char timeBuffer[6];
     for (int i = 0; i < 2; i++)
     {
-      time_t t = strtoll(myObject["current"][i == 0 ? "sunrise" : "sunset"].as<const char *>(), nullptr, 10);
+      const char *key = (i == 0) ? "sunrise" : "sunset";
+      time_t t = myObject["current"][key] | 0;
       if (t > 0)
       {
         setTime(t);
@@ -1170,7 +1161,6 @@ void weatherPrint(bool invert)
 
         // Format time as HH:MM
         snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", hour(), minute());
-
         // Draw icon and time
         iconSunRise(display, i == 0 ? 152 : 267, 170, i == 0, invert);
         u8g2Fonts.setCursor(i == 0 ? 166 : 281, 175);
@@ -1188,10 +1178,7 @@ void weatherPrint(bool invert)
     u8g2Fonts.setCursor(330, 297);
     u8g2Fonts.print("Moon Phase");
 
-    String s = String(myObject["current"]["weather"][0]["icon"].as<const char *>());
-    int lastIndex = s.length() - 1;
-    s.remove(lastIndex);
-    s.remove(0, 1);
+    String s = myObject["current"]["weather"][0]["icon"] | "";
 
     if (s == "01d")
     { // Clear Day
@@ -1233,215 +1220,36 @@ void weatherPrint(bool invert)
       iconFog(display, 330, 160, 60, invert);
 
     u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
-    s = String(myObject["current"]["weather"][0]["main"].as<const char *>());
-    lastIndex = s.length() - 1;
-    s.remove(lastIndex);
-    s.remove(0, 1);
+    s = myObject["current"]["weather"][0]["main"] | "";
+
     u8g2Fonts.setCursor(330, 227);
     u8g2Fonts.print(s);
 
     // u8g2Fonts.setCursor(186, 200);
-    s = String(myObject["alerts"][0]["event"].as<const char *>());
-    lastIndex = s.length() - 1;
-    s.remove(lastIndex);
-    s.remove(0, 1);
-    if (s != "ul")
+    if (myObject.containsKey("alerts") && myObject["alerts"].size() > 0)
     {
-      int16_t tbx, tby;
-      uint16_t tbw, tbh;
-      display.getTextBounds("Alerts: " + s, 0, 0, &tbx, &tby, &tbw, &tbh);
-      // center the bounding box by transposition of the origin:
-      uint16_t x = ((display.width() - tbw) / 2) - tbx;
-      u8g2Fonts.setCursor(x, 25); // start writing at this position
-      u8g2Fonts.print("Alerts: ");
-      u8g2Fonts.print(s);
+
+      String alert = myObject["alerts"][0]["event"] | "";
+
+      if (alert.length() > 0)
+      {
+
+        Serial.println("Alert: " + alert);
+
+        int16_t tbx, tby;
+        uint16_t tbw, tbh;
+
+        String text = "Alerts: " + alert;
+
+        display.getTextBounds(text, 0, 0, &tbx, &tby, &tbw, &tbh);
+
+        uint16_t x = ((display.width() - tbw) / 2) - tbx;
+
+        u8g2Fonts.setCursor(x, 25);
+        u8g2Fonts.print(text);
+      }
     }
   }
-}
-
-// UNCOMMENT BELOW FUNCTION AND REMOVE THE ABOVE FUNCTION WITH THE SAME NAME IF YOU WISH TO USE ONLY oPENwEATHERmAP API
-/*
-void weatherPrint()
-{
-  String serverPath = "http://api.openweathermap.org/data/3.0/onecall?lat=" + lat + "&lon=" + lon + "&exclude=hourly,minutely&units=metric&appid=" + openWeatherMapApiKey;
-
-  jsonBuffer = weatherDataAPI(serverPath.c_str());
-  if (httpResponseCode == -1 || httpResponseCode == -11)
-    ESP.restart();
-  if (DEBUG_MODE) Serial.println(jsonBuffer);
-  JsonDocument myObject;
-  deserializeJson(myObject, jsonBuffer);
-
-  // Check if parsing was successful
-  if (myObject.isNull())
-  {
-    if (DEBUG_MODE) Serial.println("Parsing input failed!");
-    ESP.restart();
-    return;
-  }
-
-  if (myObject["current"]["temp"].isNull())
-  {
-    networkInfo();
-  }
-  else
-  {
-    wifiStatus();
-    u8g2Fonts.setFont(u8g2_font_helvB10_tf);
-    u8g2Fonts.setCursor(29, 170);
-    u8g2Fonts.print("OUTDOOR");
-    u8g2Fonts.setFont(u8g2_font_fub20_tf); // u8g2_font_fub30_tf
-    uint16_t width;
-    width = u8g2Fonts.getUTF8Width(String(myObject["current"]["temp"].as<float>()).c_str());
-    u8g2Fonts.setCursor(20, 200); // start writing at this position
-    u8g2Fonts.print(myObject["current"]["temp"].as<float>());
-    u8g2Fonts.setCursor(30 + width, 200);
-    u8g2Fonts.print("C");
-    u8g2Fonts.setFont(u8g2_font_fub11_tf);
-    u8g2Fonts.setCursor(22 + width, 185); // start writing at this position
-    u8g2Fonts.print("o");
-
-    u8g2Fonts.setFont(u8g2_font_fur11_tf); // u8g2_font_fur14_tf
-    width = u8g2Fonts.getUTF8Width(("Real Feel:" + String(myObject["current"]["feels_like"].as<float>())).c_str());
-    u8g2Fonts.setCursor(5, 220); // start writing at this position
-    u8g2Fonts.print("Real Feel:");
-    u8g2Fonts.setCursor(75, 220);
-    u8g2Fonts.print(myObject["current"]["feels_like"].as<float>());
-    u8g2Fonts.setCursor(width + 16, 220);
-    u8g2Fonts.print(String("C"));
-    u8g2Fonts.setFont(u8g2_font_baby_tf); // u8g2_font_robot_de_niro_tf
-    u8g2Fonts.setCursor(13 + width, 211); // start writing at this position
-    u8g2Fonts.print("o");
-
-    u8g2Fonts.setFont(u8g2_font_fur14_tf);
-    u8g2Fonts.setCursor(5, 245); // start writing at this position
-    u8g2Fonts.print(myObject["current"]["humidity"].as<float>());
-    u8g2Fonts.print(String("%"));
-
-    u8g2Fonts.setCursor(5, 270); // start writing at this position
-    u8g2Fonts.print(myObject["current"]["pressure"].as<float>());
-    u8g2Fonts.print(String("hPa"));
-    u8g2Fonts.setFont(u8g2_font_helvB10_tf);
-    u8g2Fonts.setCursor(5, 294); // start writing at this position
-    u8g2Fonts.print("UVI: ");
-    u8g2Fonts.print(myObject["current"]["uvi"].as<float>());
-    u8g2Fonts.setFont(u8g2_font_fur11_tf);
-    double uv = myObject["current"]["uvi"].as<float>();
-    if (uv < 2)
-      u8g2Fonts.print(" Low");
-    else if (uv < 5)
-      u8g2Fonts.print(" Medium");
-    else if (uv <= 7)
-      u8g2Fonts.print(" High");
-    else if (uv > 7)
-      u8g2Fonts.print(" Danger");
-    display.drawLine(136, 155, 136, 299, GxEPD_RED);
-    display.drawLine(137, 155, 137, 299, GxEPD_RED);
-
-    // Sunset sunrise print
-    time_t t = strtoll(myObject["current"]["sunrise"].as<const char*>(), nullptr, 10);
-    setTime(t);
-    adjustTime(19800);
-    iconSunRise(display, 152, 170, true);
-    u8g2Fonts.setCursor(166, 175); // start writing at this position
-    u8g2Fonts.print("0");
-    u8g2Fonts.print(hour());
-    u8g2Fonts.print(":");
-    u8g2Fonts.print(minute() < 10 ? "0" + String(minute()) : minute());
-
-    t = strtoll(myObject["current"]["sunset"].as<const char*>(), nullptr, 10);
-    setTime(t);
-    adjustTime(19800);
-    iconSunRise(display, 267, 170, false);
-    u8g2Fonts.setCursor(281, 175);
-    u8g2Fonts.print(hour());
-    u8g2Fonts.print(":");
-    u8g2Fonts.print(minute() < 10 ? "0" + String(minute()) : minute());
-
-    display.drawLine(320, 155, 320, 299, GxEPD_RED);
-    display.drawLine(321, 155, 321, 299, GxEPD_RED);
-    display.drawLine(320, 230, 400, 230, GxEPD_RED);
-    display.drawLine(320, 231, 400, 231, GxEPD_RED);
-
-    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"].as<float>()));
-    u8g2Fonts.setFont(u8g2_font_luRS08_tf);
-    u8g2Fonts.setCursor(330, 297);
-    u8g2Fonts.print("Moon Phase");
-
-    String s = String(myObject["current"]["weather"][0]["icon"].as<const char*>());
-    int lastIndex = s.length() - 1;
-    s.remove(lastIndex);
-    s.remove(0, 1);
-
-    if (s == "01d")
-    { // Clear Day
-      iconSun(display, 361, 189, 15);
-      // iconSleet(x,y,r);//iconHail(x,y,r);//same
-      // iconWind(x,y,r);
-      // iconTornado(x,y,r);
-    }
-    else if (s == "01n") // Clear Night
-      iconMoon(display, 361, 189, 15);
-    else if (s == "02d") // few clouds
-      iconCloudyDay(display, 330, 160, 60);
-    else if (s == "02n")
-      iconCloudyNight(display, 330, 160, 60);
-    else if (s == "03d") // scattered clouds
-      iconCloud(display, 361, 189, 15);
-    else if (s == "03n")
-      iconCloud(display, 361, 189, 15);
-    else if (s == "04d") // broken clouds (two clouds)
-      iconCloudy(display, 330, 160, 60);
-    else if (s == "04n")
-      iconCloudy(display, 330, 160, 60);
-    else if (s == "09d") // shower rain
-      iconSleet(display, 330, 160, 60);
-    else if (s == "09n")
-      iconSleet(display, 330, 160, 60);
-    else if (s == "10d") // snow
-      iconRain(display, 330, 160, 60);
-    else if (s == "10n")
-      iconRain(display, 330, 160, 60);
-    else if (s == "11d") // thunderstorm
-      iconThunderstorm(display, 330, 160, 60);
-    else if (s == "11n")
-      iconThunderstorm(display, 330, 160, 60);
-    else if (s == "13d") // snow
-      iconSnow(display, 330, 160, 60);
-    else if (s == "13n")
-      iconSnow(display, 330, 160, 60);
-    else if (s == "50d") // mist
-      iconFog(display, 330, 160, 60);
-    else if (s == "50n")
-      iconFog(display, 330, 160, 60);
-
-    u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
-    s = String(myObject["current"]["weather"][0]["main"].as<const char*>());
-    lastIndex = s.length() - 1;
-    s.remove(lastIndex);
-    s.remove(0, 1);
-    u8g2Fonts.setCursor(330, 227);
-    u8g2Fonts.print(s);
-
-    // u8g2Fonts.setCursor(186, 200);
-    s = String(myObject["alerts"][0]["event"].as<const char*>());
-    lastIndex = s.length() - 1;
-    s.remove(lastIndex);
-    s.remove(0, 1);
-    if (s != "ul")
-    {
-      int16_t tbx, tby;
-      uint16_t tbw, tbh;
-      display.getTextBounds("Alerts: " + s, 0, 0, &tbx, &tby, &tbw, &tbh);
-      // center the bounding box by transposition of the origin:
-      uint16_t x = ((display.width() - tbw) / 2) - tbx;
-      u8g2Fonts.setCursor(x, 25); // start writing at this position
-      u8g2Fonts.print("Alerts: ");
-      u8g2Fonts.print(s);
-    }
-  }
-  // Turn off WiFi as soon as possible after data fetch
-  turnOffWifi();
 }
 
 //=============== UI HELPER FUNCTIONS ===============
