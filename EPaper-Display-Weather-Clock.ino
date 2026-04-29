@@ -589,7 +589,7 @@ void setup()
         Serial.println("RTC Ready");
 
       DateTime now = rtc.now();
-      if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() < = 15))
+      if ((now.hour() == 0) && (now.minute() >= 0 && now.minute() <= 15))
       { // reset high low at midnight
         hTemp = 0.0;
         lTemp = 60.0;
