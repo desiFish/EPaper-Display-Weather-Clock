@@ -1,6 +1,6 @@
 /*
 epdWeatherClockV1.ino
-Copyright (C) 2024 desiFish
+Copyright (C) 2024-2025 desiFish
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ Copyright (C) 2024 desiFish
 #include "image.h"  //for sleep icon
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <Arduino_JSON.h>
+#include <ArduinoJson.h>
 #include <BH1750.h>  // Light sensor library
 #include <TimeLib.h> // for time functions
 #include "icons.h"   // for weather icons
@@ -106,6 +106,7 @@ U8G2_FOR_ADAFRUIT_GFX u8g2Fonts; // u8g2 fonts
 #define battHigh 3.3             // battHigh: Healthy battery threshold voltage (Change accordingly)
 #define battLow 2.9              // battLow: Low battery warning threshold (Change accordingly)
 #define critBattPercent 30       // critBattPercent: Critical battery percentage threshold
+// #define SHOW_BATTERY_VOLT false  // SHOW_BATTERY_VOLT: Set to true to display battery voltage, false to display percentage
 
 /**
  * @brief Sleep configuration
@@ -129,6 +130,9 @@ String jsonBuffer; // for storing json data from api
 char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 char monthName[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+const char fullDaysOfTheWeek[7][10] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+const char fullMonthName[12][10] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+
 int httpResponseCode; // for storing http response code
 
 // DEBUG_MODE update frequency
@@ -150,6 +154,21 @@ const char *PARAM_INPUT_1 = "ssid";
 const char *PARAM_INPUT_2 = "pass";
 
 //=============== HELPER FUNCTIONS ===============
+
+/**
+ * @brief Blinks LED to indicate errors
+ */
+void errLeds(void)
+{
+  if (DEBUG_PIN != LED_BUILTIN) // Only set pin if not already used
+  {
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(100);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(100);
+  }
+}
 
 /**
  * @brief Measures battery voltage with averaging
@@ -223,8 +242,7 @@ bool autoTimeUpdate()
                           timeClient.getSeconds()));
 
       if (DEBUG_MODE)
-        Serial.println("RTC updated: " + String(year) + "-" +
-                       String(month) + "-" + String(day));
+        Serial.println("RTC updated: " + String(year) + "-" + String(month) + "-" + String(day));
       return true;
     }
     else
@@ -239,7 +257,7 @@ bool autoTimeUpdate()
  * @param offset Vertical offset for display positioning (default: 0)
  * @param invert Inverts colors for ghost protection (default: false)
  */
-void tempPrint(byte offset = 0, bool invert = false);
+void onlineTimePrint(bool invert = false);
 
 /**
  * @brief Displays network debugging information
@@ -294,6 +312,7 @@ void weatherPrint(bool invert = false);
  * @note Enters deep sleep mode after completion unless in debug mode
  * @note Some features are disabled when battery is critical
  */
+
 void setup()
 {
   setCpuFrequencyMhz(20); // Set CPU to 20MHz
@@ -319,7 +338,7 @@ void setup()
 
   u8g2Fonts.begin(display); // connect u8g2 procedures to Adafruit GFX
 
-  if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
+  /*if (lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE))
   {
     if (DEBUG_MODE)
       Serial.println(F("BH1750 Advanced begin"));
@@ -336,8 +355,8 @@ void setup()
   while (!lightMeter.measurementReady(true))
   {
     yield(); // Wait for the measurement to be ready
-  }
-  lux = lightMeter.readLightLevel(); // Get Lux value from sensor
+  }*/
+  float lux = 50; // lightMeter.readLightLevel(); // Get Lux value from sensor
   if (DEBUG_MODE)
   {
     Serial.print("Light: ");
@@ -405,7 +424,7 @@ void setup()
                 Serial.print("Password set to: ");
                 Serial.println(password);
               }
-              password.trim(); // remove leading and trailing spaces
+              password.trim();  // remove leading and trailing spaces
               pref.putString("password", password);
             }
             //if (DEBUG_MODE) Serial.printf("POST[%s]: %s\n", p->name().c_str(), p->value().c_str());
@@ -467,12 +486,12 @@ void setup()
     if (DEBUG_MODE)
       Serial.println("BME Ready");
 
-    // Set up oversampling and filter initialization
-    bme.setTemperatureOversampling(BME680_OS_2X);
-    bme.setHumidityOversampling(BME680_OS_16X);
-    bme.setPressureOversampling(BME680_OS_16X);
+    // Set up oversampling and filter initialization for accurate readings
+    bme.setTemperatureOversampling(BME680_OS_8X);
+    bme.setHumidityOversampling(BME680_OS_8X);
+    bme.setPressureOversampling(BME680_OS_8X);
     bme.setIIRFilterSize(BME680_FILTER_SIZE_7);
-    bme.setGasHeater(0, 0); // 0*C for 0 ms
+    bme.setGasHeater(0, 0); // 320°C for 150 ms
 
     if (!BATTERY_CRITICAL) // Connect to Wi-Fi network with SSID and password if battery is not critical
     {
@@ -584,14 +603,14 @@ void setup()
         if (bootCount == ghostProtek)
         {
           display.fillScreen(GxEPD_BLACK);
-          tempPrint(0, true); // prints temperature and battery level
-          weatherPrint(true); // prints weather data
+          onlineTimePrint(true); // prints temperature and battery level
+          weatherPrint(true);    // prints weather data
         }
         else // if not ghost protection, then normal display
         {
           display.fillScreen(GxEPD_WHITE);
-          tempPrint();    // prints temperature and battery level
-          weatherPrint(); // prints weather data
+          onlineTimePrint(); // prints temperature and battery level
+          weatherPrint();    // prints weather data
         }
         if (bootCount == ghostProtek) // reset boot counter after ghost protection
           bootCount = 0;
@@ -605,10 +624,12 @@ void setup()
         display.fillScreen(GxEPD_WHITE);
         if (DEBUG_MODE)
           Serial.println("Time Only");
-        display.drawBitmap(270, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
-        tempPrint(40);                                            // offset for wifi off which shifts the temperature display to the middle
+        display.drawBitmap(333, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
+        offlineTimePrint();                                       // offset for wifi off which shifts the temperature display to the middle
         if (DEBUG_MODE)
           Serial.println("Time Done");
+        if (BATTERY_CRITICAL)
+          TIME_TO_SLEEP = 1800; // 30 min sleep time when battery is critical (POWER SAVER MODE)
       }
     } while (display.nextPage());
     display.hibernate();
@@ -660,8 +681,8 @@ void loop()
   if ((millis() - lastTime1) > timerDelay1)
   {
     Serial.println("In LOOP");
-    errMsg("DEBUG MODE"); // Display debug message
-    // Additional debug functions can be added here
+    // errMsg("DEBUG MODE"); // Display debug message
+    //  Additional debug functions can be added here
     lastTime1 = millis();
   }
   yield();
@@ -733,11 +754,11 @@ bool checkHttpResponse(const char *source)
 }
 
 /**
- * @brief Prints temperature and environmental data
+ * @brief Prints temperature and environmental data when WiFi is connected
  * @param offset Vertical offset for display positioning (default: 0)
  * @param invert Inverts colors for ghost protection (default: false)
  */
-void tempPrint(byte offset, bool invert)
+void onlineTimePrint(bool invert)
 {
   // Configure fonts and colors once at the start
   uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
@@ -795,33 +816,33 @@ void tempPrint(byte offset, bool invert)
   sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
 
   u8g2Fonts.setCursor(295, 11);
-  u8g2Fonts.print("Last Update: ");
+  // u8g2Fonts.print("Last Update: "); //to be corrected later, overlapping with battery icon
   u8g2Fonts.print(timeStr);
 
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
-  u8g2Fonts.setCursor(10, 75 + offset);
+  u8g2Fonts.setCursor(10, 75);
   u8g2Fonts.print(now.day() < 10 ? "0" : "");
   u8g2Fonts.print(now.day());
   u8g2Fonts.print(", ");
   u8g2Fonts.print(monthName[now.month() - 1]);
-  u8g2Fonts.setCursor(10, 105 + offset);
+  u8g2Fonts.setCursor(10, 105);
   u8g2Fonts.print(daysOfTheWeek[now.dayOfTheWeek()]);
 
   // Main temperature display
   u8g2Fonts.setFont(u8g2_font_inb19_mf);
-  u8g2Fonts.setCursor(320, 60 + offset);
+  u8g2Fonts.setCursor(320, 60);
   u8g2Fonts.print("o");
 
   u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
-  u8g2Fonts.setCursor(150, 110 + offset);
+  u8g2Fonts.setCursor(150, 110);
   u8g2Fonts.print(String(tempC));
-  u8g2Fonts.setCursor(330, 110 + offset);
+  u8g2Fonts.setCursor(330, 110);
   u8g2Fonts.print("C");
 
   // Draw separator lines
   for (int i = 0; i < 2; i++)
   {
-    display.fillRect(0, 121 + offset + (i * 33), 400, 2, lineColor);
+    display.fillRect(0, 121 + (i * 33), 400, 2, lineColor);
   }
 
   // Environmental readings
@@ -834,11 +855,11 @@ void tempPrint(byte offset, bool invert)
 
   // Display environmental data
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
-  u8g2Fonts.setCursor(2, 150 + offset);
+  u8g2Fonts.setCursor(2, 150);
   u8g2Fonts.print(bme.humidity);
   u8g2Fonts.print("%");
 
-  u8g2Fonts.setCursor(264, 150 + offset);
+  u8g2Fonts.setCursor(264, 150);
   u8g2Fonts.print(bme.pressure / 100.0);
   u8g2Fonts.print("hPa");
 
@@ -850,16 +871,173 @@ void tempPrint(byte offset, bool invert)
 
   for (int i = 0; i < 2; i++)
   {
-    u8g2Fonts.setCursor(positions[i], 148 + offset);
+    u8g2Fonts.setCursor(positions[i], 148);
     u8g2Fonts.print(labels[i]);
     u8g2Fonts.print(temps[i]);
     u8g2Fonts.setFont(u8g2_font_fub11_tf);
-    u8g2Fonts.setCursor(positions[i] + 63, 138 + offset);
+    u8g2Fonts.setCursor(positions[i] + 63, 138);
     u8g2Fonts.print("o");
     u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
-    u8g2Fonts.setCursor(positions[i] + 73, 148 + offset);
+    u8g2Fonts.setCursor(positions[i] + 73, 148);
     u8g2Fonts.print("C");
   }
+}
+
+/**
+ * @brief Prints only time and temperature data (no weather)
+ * @note Used when WiFi is not connected or in offline mode
+ */
+void offlineTimePrint()
+{
+  // Temperature reading
+  float tempC = 0;
+  if (sensor.dataReady())
+  {
+    tempC = sensor.readTempC();
+    hTemp = max(hTemp, tempC);
+    lTemp = min(lTemp, tempC);
+  }
+
+  // Battery level handling
+  float newBattLevel = batteryLevel();
+  battLevel = (newBattLevel < battLevel) ? newBattLevel : ((newBattLevel - battLevel) >= battChangeThreshold || newBattLevel > battHigh) ? newBattLevel
+                                                                                                                                         : battLevel;
+
+  int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
+  BATTERY_CRITICAL = percent < critBattPercent;
+
+  // Configure fonts and colors once at the start
+  uint16_t bg = GxEPD_WHITE;
+  uint16_t fg = GxEPD_BLACK;
+  uint16_t lineColor = GxEPD_RED;
+
+  u8g2Fonts.setFontMode(1);
+  u8g2Fonts.setFontDirection(0);
+  u8g2Fonts.setForegroundColor(fg);
+  u8g2Fonts.setBackgroundColor(bg);
+
+  // Battery voltage display section
+  if (true)
+  {
+    u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+    u8g2Fonts.setCursor(2, 11);
+    u8g2Fonts.print(battLevel, 2);
+    u8g2Fonts.print("V");
+  }
+
+  u8g2Fonts.setCursor(165, 11);
+  u8g2Fonts.print("OFFLINE MODE");
+  u8g2Fonts.setCursor(367, 11);
+  if (battLevel < 4)
+  {
+    u8g2Fonts.print(percent, 1);
+    u8g2Fonts.print("%");
+  }
+  else
+  {
+    u8g2Fonts.setCursor(370, 11);
+    u8g2Fonts.print("USB");
+  }
+
+  if (BATTERY_CRITICAL)
+  {
+    u8g2Fonts.setFont(u8g2_font_profont22_tf);
+    u8g2Fonts.setCursor(40, 292);
+    u8g2Fonts.print("BATTERY LOW, POWER-SAVER ON");
+  }
+
+  iconBattery(display, percent);
+
+  // Main temperature display
+  u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
+  u8g2Fonts.setCursor(100, 110);
+  u8g2Fonts.print(String(tempC));
+  u8g2Fonts.setCursor(280, 110);
+  u8g2Fonts.print("C");
+  u8g2Fonts.setFont(u8g2_font_inb19_mf);
+  u8g2Fonts.setCursor(270, 60);
+  u8g2Fonts.print("o");
+
+  DateTime now = rtc.now();
+  u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
+  u8g2Fonts.setCursor(10, 150);
+  u8g2Fonts.print(now.day() < 10 ? "0" : "");
+  u8g2Fonts.print(now.day());
+  u8g2Fonts.print("/");
+  u8g2Fonts.print(fullMonthName[now.month() - 1]);
+  u8g2Fonts.print("/");
+  u8g2Fonts.print(now.year());
+  u8g2Fonts.setCursor(270, 150);
+  u8g2Fonts.print(fullDaysOfTheWeek[now.dayOfTheWeek()]);
+
+  if (!BATTERY_CRITICAL)
+  {
+    display.fillRect(0, 160, 400, 3, lineColor); // top line
+
+    display.fillRect(0, 259, 400, 3, lineColor); // bottom line
+
+    display.fillRect(0, 160, 3, 100, lineColor); // vertical line first
+
+    display.fillRect(150, 160, 3, 100, lineColor); // vertical line second
+
+    display.fillRect(300, 160, 3, 100, lineColor); // vertical line second
+
+    display.fillRect(397, 160, 3, 100, lineColor); // vertical line last
+  }
+  // Environmental readings
+  if (!bme.beginReading() || !bme.endReading())
+  {
+    if (DEBUG_MODE)
+      Serial.println("BME READING ERROR");
+    return;
+  }
+
+  u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
+  float temps[] = {hTemp, lTemp};
+  u8g2Fonts.setCursor(6, 200);
+  u8g2Fonts.print("HIGH:");
+  u8g2Fonts.print(temps[0]);
+  u8g2Fonts.setFont(u8g2_font_fub11_tf);
+  u8g2Fonts.setCursor(124, 185);
+  u8g2Fonts.print("o");
+  u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
+  u8g2Fonts.setCursor(133, 200);
+  u8g2Fonts.print("C");
+
+  u8g2Fonts.setCursor(6, 240);
+  u8g2Fonts.print("LOW:");
+  u8g2Fonts.print(temps[1]);
+  u8g2Fonts.setFont(u8g2_font_fub11_tf);
+  u8g2Fonts.setCursor(116, 225);
+  u8g2Fonts.print("o");
+  u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
+  u8g2Fonts.setCursor(124, 240);
+  u8g2Fonts.print("C");
+
+  // Display environmental data
+  u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
+
+  display.drawBitmap(155, 174, humiIcon, 32, 32, fg);
+  u8g2Fonts.setCursor(188, 200);
+  u8g2Fonts.print(bme.humidity);
+  u8g2Fonts.print("%");
+
+  // Draw gauge icon for pressure
+  display.drawBitmap(155, 214, gaugeIcon, 32, 32, fg);
+  u8g2Fonts.setCursor(188, 240);
+  u8g2Fonts.print(bme.pressure / 100.0);
+  u8g2Fonts.setFont(u8g2_font_6x13_tf);
+  u8g2Fonts.print("hPa");
+
+  // Last update time
+  char timeStr[6];
+  sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+  u8g2Fonts.setFont(u8g2_font_8x13_tf);
+  u8g2Fonts.setCursor(306, 190);
+  u8g2Fonts.print("Last Update");
+  u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
+  u8g2Fonts.setCursor(319, 240);
+  u8g2Fonts.print(timeStr);
 }
 
 /**
@@ -886,10 +1064,11 @@ void weatherPrint(bool invert)
     return;
   if (DEBUG_MODE)
     Serial.println(jsonBuffer);
-  JSONVar myObject = JSON.parse(jsonBuffer);
+  JsonDocument myObject;
+  deserializeJson(myObject, jsonBuffer);
 
-  // JSON.typeof(jsonVar) can be used to get the type of the var
-  if (JSON.typeof(myObject) == "undefined")
+  // Check if parsing was successful
+  if (myObject.isNull())
   {
     if (DEBUG_MODE)
       Serial.println("Parsing input failed!");
@@ -905,10 +1084,11 @@ void weatherPrint(bool invert)
     return;
   if (DEBUG_MODE)
     Serial.println(jsonBuffer);
-  JSONVar customObject = JSON.parse(jsonBuffer);
+  JsonDocument customObject;
+  deserializeJson(customObject, jsonBuffer);
 
-  // JSON.typeof(jsonVar) can be used to get the type of the var
-  if (JSON.typeof(customObject) == "undefined")
+  // Check if parsing was successful
+  if (customObject.isNull())
   {
     if (DEBUG_MODE)
       Serial.println("Parsing input failed!");
@@ -916,7 +1096,7 @@ void weatherPrint(bool invert)
     return;
   }
 
-  if (myObject["current"]["temp"] == null)
+  if (myObject["current"]["temp"].isNull())
     networkInfo();
   else
   {
@@ -931,9 +1111,9 @@ void weatherPrint(bool invert)
     u8g2Fonts.print("OUTDOOR");
     u8g2Fonts.setFont(u8g2_font_fub20_tf); // u8g2_font_fub30_tf
     uint16_t width;
-    width = u8g2Fonts.getUTF8Width(JSON.stringify(customObject["data"]["temp"]).c_str());
+    width = u8g2Fonts.getUTF8Width(String(customObject["data"]["temp"].as<float>()).c_str());
     u8g2Fonts.setCursor(20, 200); // start writing at this position
-    u8g2Fonts.print(customObject["data"]["temp"]);
+    u8g2Fonts.print(customObject["data"]["temp"].as<float>());
     u8g2Fonts.setCursor(30 + width, 200);
     u8g2Fonts.print("C");
     u8g2Fonts.setFont(u8g2_font_fub11_tf);
@@ -941,11 +1121,11 @@ void weatherPrint(bool invert)
     u8g2Fonts.print("o");
 
     u8g2Fonts.setFont(u8g2_font_fur11_tf); // u8g2_font_fur14_tf
-    width = u8g2Fonts.getUTF8Width(("Real Feel:" + JSON.stringify(myObject["current"]["feels_like"])).c_str());
+    width = u8g2Fonts.getUTF8Width(("Real Feel:" + String(myObject["current"]["feels_like"].as<float>())).c_str());
     u8g2Fonts.setCursor(5, 220); // start writing at this position
     u8g2Fonts.print("Real Feel:");
     u8g2Fonts.setCursor(75, 220);
-    u8g2Fonts.print(myObject["current"]["feels_like"]);
+    u8g2Fonts.print(myObject["current"]["feels_like"].as<float>());
     u8g2Fonts.setCursor(width + 16, 220);
     u8g2Fonts.print(String("C"));
     u8g2Fonts.setFont(u8g2_font_baby_tf); // u8g2_font_robot_de_niro_tf
@@ -954,18 +1134,18 @@ void weatherPrint(bool invert)
 
     u8g2Fonts.setFont(u8g2_font_fur14_tf);
     u8g2Fonts.setCursor(5, 245); // start writing at this position
-    u8g2Fonts.print(customObject["data"]["humidity"]);
+    u8g2Fonts.print(customObject["data"]["humidity"].as<float>());
     u8g2Fonts.print(String("%"));
 
     u8g2Fonts.setCursor(5, 270); // start writing at this position
-    u8g2Fonts.print(customObject["data"]["pressure"]);
+    u8g2Fonts.print(customObject["data"]["pressure"].as<float>());
     u8g2Fonts.print(String("hPa"));
     u8g2Fonts.setFont(u8g2_font_helvB10_tf);
     u8g2Fonts.setCursor(5, 294); // start writing at this position
     u8g2Fonts.print("UVI: ");
-    u8g2Fonts.print(myObject["current"]["uvi"]);
+    u8g2Fonts.print(myObject["current"]["uvi"].as<float>());
     u8g2Fonts.setFont(u8g2_font_fur11_tf);
-    double uv = double(myObject["current"]["uvi"]);
+    double uv = double(myObject["current"]["uvi"].as<float>());
     if (uv < 2)
       u8g2Fonts.print(" Low");
     else if (uv < 5)
@@ -982,7 +1162,7 @@ void weatherPrint(bool invert)
     char timeBuffer[6];
     for (int i = 0; i < 2; i++)
     {
-      time_t t = strtoll(JSON.stringify(myObject["current"][i == 0 ? "sunrise" : "sunset"]).c_str(), nullptr, 10);
+      time_t t = strtoll(myObject["current"][i == 0 ? "sunrise" : "sunset"].as<const char *>(), nullptr, 10);
       if (t > 0)
       {
         setTime(t);
@@ -1003,12 +1183,12 @@ void weatherPrint(bool invert)
     // Horizontal divider line
     display.fillRect(320, 230, 80, 2, red); // 80 = 400-320
 
-    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"]), invert);
+    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"].as<float>()), invert);
     u8g2Fonts.setFont(u8g2_font_luRS08_tf);
     u8g2Fonts.setCursor(330, 297);
     u8g2Fonts.print("Moon Phase");
 
-    String s = JSON.stringify(myObject["current"]["weather"][0]["icon"]);
+    String s = String(myObject["current"]["weather"][0]["icon"].as<const char *>());
     int lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);
@@ -1053,7 +1233,7 @@ void weatherPrint(bool invert)
       iconFog(display, 330, 160, 60, invert);
 
     u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
-    s = JSON.stringify(myObject["current"]["weather"][0]["main"]);
+    s = String(myObject["current"]["weather"][0]["main"].as<const char *>());
     lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);
@@ -1061,7 +1241,7 @@ void weatherPrint(bool invert)
     u8g2Fonts.print(s);
 
     // u8g2Fonts.setCursor(186, 200);
-    s = JSON.stringify(myObject["alerts"][0]["event"]);
+    s = String(myObject["alerts"][0]["event"].as<const char *>());
     lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);
@@ -1089,17 +1269,18 @@ void weatherPrint()
   if (httpResponseCode == -1 || httpResponseCode == -11)
     ESP.restart();
   if (DEBUG_MODE) Serial.println(jsonBuffer);
-  JSONVar myObject = JSON.parse(jsonBuffer);
+  JsonDocument myObject;
+  deserializeJson(myObject, jsonBuffer);
 
-  // JSON.typeof(jsonVar) can be used to get the type of the var
-  if (JSON.typeof(myObject) == "undefined")
+  // Check if parsing was successful
+  if (myObject.isNull())
   {
     if (DEBUG_MODE) Serial.println("Parsing input failed!");
     ESP.restart();
     return;
   }
 
-  if (myObject["current"]["temp"] == null)
+  if (myObject["current"]["temp"].isNull())
   {
     networkInfo();
   }
@@ -1111,9 +1292,9 @@ void weatherPrint()
     u8g2Fonts.print("OUTDOOR");
     u8g2Fonts.setFont(u8g2_font_fub20_tf); // u8g2_font_fub30_tf
     uint16_t width;
-    width = u8g2Fonts.getUTF8Width(JSON.stringify(myObject["current"]["temp"]).c_str());
+    width = u8g2Fonts.getUTF8Width(String(myObject["current"]["temp"].as<float>()).c_str());
     u8g2Fonts.setCursor(20, 200); // start writing at this position
-    u8g2Fonts.print(myObject["current"]["temp"]);
+    u8g2Fonts.print(myObject["current"]["temp"].as<float>());
     u8g2Fonts.setCursor(30 + width, 200);
     u8g2Fonts.print("C");
     u8g2Fonts.setFont(u8g2_font_fub11_tf);
@@ -1121,11 +1302,11 @@ void weatherPrint()
     u8g2Fonts.print("o");
 
     u8g2Fonts.setFont(u8g2_font_fur11_tf); // u8g2_font_fur14_tf
-    width = u8g2Fonts.getUTF8Width(("Real Feel:" + JSON.stringify(myObject["current"]["feels_like"])).c_str());
+    width = u8g2Fonts.getUTF8Width(("Real Feel:" + String(myObject["current"]["feels_like"].as<float>())).c_str());
     u8g2Fonts.setCursor(5, 220); // start writing at this position
     u8g2Fonts.print("Real Feel:");
     u8g2Fonts.setCursor(75, 220);
-    u8g2Fonts.print(myObject["current"]["feels_like"]);
+    u8g2Fonts.print(myObject["current"]["feels_like"].as<float>());
     u8g2Fonts.setCursor(width + 16, 220);
     u8g2Fonts.print(String("C"));
     u8g2Fonts.setFont(u8g2_font_baby_tf); // u8g2_font_robot_de_niro_tf
@@ -1134,18 +1315,18 @@ void weatherPrint()
 
     u8g2Fonts.setFont(u8g2_font_fur14_tf);
     u8g2Fonts.setCursor(5, 245); // start writing at this position
-    u8g2Fonts.print(myObject["current"]["humidity"]);
+    u8g2Fonts.print(myObject["current"]["humidity"].as<float>());
     u8g2Fonts.print(String("%"));
 
     u8g2Fonts.setCursor(5, 270); // start writing at this position
-    u8g2Fonts.print(myObject["current"]["pressure"]);
+    u8g2Fonts.print(myObject["current"]["pressure"].as<float>());
     u8g2Fonts.print(String("hPa"));
     u8g2Fonts.setFont(u8g2_font_helvB10_tf);
     u8g2Fonts.setCursor(5, 294); // start writing at this position
     u8g2Fonts.print("UVI: ");
-    u8g2Fonts.print(myObject["current"]["uvi"]);
+    u8g2Fonts.print(myObject["current"]["uvi"].as<float>());
     u8g2Fonts.setFont(u8g2_font_fur11_tf);
-    double uv = double(myObject["current"]["uvi"]);
+    double uv = myObject["current"]["uvi"].as<float>();
     if (uv < 2)
       u8g2Fonts.print(" Low");
     else if (uv < 5)
@@ -1158,7 +1339,7 @@ void weatherPrint()
     display.drawLine(137, 155, 137, 299, GxEPD_RED);
 
     // Sunset sunrise print
-    time_t t = strtoll(JSON.stringify(myObject["current"]["sunrise"]).c_str(), nullptr, 10);
+    time_t t = strtoll(myObject["current"]["sunrise"].as<const char*>(), nullptr, 10);
     setTime(t);
     adjustTime(19800);
     iconSunRise(display, 152, 170, true);
@@ -1168,7 +1349,7 @@ void weatherPrint()
     u8g2Fonts.print(":");
     u8g2Fonts.print(minute() < 10 ? "0" + String(minute()) : minute());
 
-    t = strtoll(JSON.stringify(myObject["current"]["sunset"]).c_str(), nullptr, 10);
+    t = strtoll(myObject["current"]["sunset"].as<const char*>(), nullptr, 10);
     setTime(t);
     adjustTime(19800);
     iconSunRise(display, 267, 170, false);
@@ -1182,12 +1363,12 @@ void weatherPrint()
     display.drawLine(320, 230, 400, 230, GxEPD_RED);
     display.drawLine(320, 231, 400, 231, GxEPD_RED);
 
-    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"]));
+    iconMoonPhase(display, 360, 260, 20, double(myObject["daily"][0]["moon_phase"].as<float>()));
     u8g2Fonts.setFont(u8g2_font_luRS08_tf);
     u8g2Fonts.setCursor(330, 297);
     u8g2Fonts.print("Moon Phase");
 
-    String s = JSON.stringify(myObject["current"]["weather"][0]["icon"]);
+    String s = String(myObject["current"]["weather"][0]["icon"].as<const char*>());
     int lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);
@@ -1235,7 +1416,7 @@ void weatherPrint()
       iconFog(display, 330, 160, 60);
 
     u8g2Fonts.setFont(u8g2_font_luRS08_tf); // u8g2_font_fur11_tf
-    s = JSON.stringify(myObject["current"]["weather"][0]["main"]);
+    s = String(myObject["current"]["weather"][0]["main"].as<const char*>());
     lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);
@@ -1243,7 +1424,7 @@ void weatherPrint()
     u8g2Fonts.print(s);
 
     // u8g2Fonts.setCursor(186, 200);
-    s = JSON.stringify(myObject["alerts"][0]["event"]);
+    s = String(myObject["alerts"][0]["event"].as<const char*>());
     lastIndex = s.length() - 1;
     s.remove(lastIndex);
     s.remove(0, 1);

@@ -2,7 +2,8 @@
 #define ICONS_H
 
 #include <GxEPD2_3C.h>
-
+extern const unsigned char gaugeIcon[];
+extern const unsigned char humiIcon[];
 // Helper function to invert colors
 uint16_t invertColor(uint16_t color, bool invert);
 
