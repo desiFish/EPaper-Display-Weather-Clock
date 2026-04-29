@@ -139,6 +139,20 @@ const char fullMonthName[12][10] = {"January", "February", "March", "April", "Ma
 
 int httpResponseCode; // for storing http response code
 
+const int16_t TOP_STATUS_HEIGHT = 14;
+const int16_t TOP_STATUS_PADDING_X = 4;
+const int16_t TOP_STATUS_TEXT_Y = 11;
+const int16_t TOP_STATUS_ICON_Y = -1;
+const int16_t TOP_STATUS_BATTERY_Y = 4;
+const int16_t TOP_STATUS_BATTERY_WIDTH = 16;
+const int16_t TOP_STATUS_WIFI_WIDTH = 12;
+const int16_t TOP_STATUS_WIFI_ERROR_WIDTH = 13;
+const int16_t TOP_STATUS_GAP = 6;
+
+const byte TOP_STATUS_WIFI_CONNECTED = 0;
+const byte TOP_STATUS_WIFI_OFF = 1;
+const byte TOP_STATUS_WIFI_ERROR = 2;
+
 // DEBUG_MODE update frequency
 unsigned long lastTime1 = 0;    // Last light sensor update
 const long timerDelay1 = 60000; // Light sensor update interval (60 seconds)
@@ -210,26 +224,100 @@ String currentAlertText()
  * @param msg Alert text to print
  * @param invert Clears the alert strip with the current screen background color
  */
-void printAlertLine(String msg, bool invert)
+void printAlertLine(const String &msg, bool invert)
 {
   uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
-  display.fillRect(0, 14, 400, 16, bg);
+  display.fillRect(0, TOP_STATUS_HEIGHT, display.width(), 16, bg);
 
   if (msg.length() == 0)
     return;
 
   String text = "Alerts: " + msg;
-  if (text.length() > 58)
-    text = text.substring(0, 55) + "...";
-
   u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+  while (u8g2Fonts.getUTF8Width(text.c_str()) > display.width() && text.length() > 4)
+    text = text.substring(0, text.length() - 4) + "...";
+
   uint16_t textWidth = u8g2Fonts.getUTF8Width(text.c_str());
   int16_t x = 0;
   if (textWidth < display.width())
     x = (display.width() - textWidth) / 2;
 
-  u8g2Fonts.setCursor(x, 25);
+  u8g2Fonts.setCursor(x, TOP_STATUS_HEIGHT + 11);
   u8g2Fonts.print(text);
+}
+
+void drawTopWifiIcon(byte wifiState, int16_t x, int16_t y, bool invert)
+{
+  uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
+  if (wifiState == TOP_STATUS_WIFI_OFF)
+    display.drawBitmap(x, y, wifiOff, 12, 12, fg);
+  else if (wifiState == TOP_STATUS_WIFI_ERROR)
+    display.drawBitmap(x, y, wifiError, 13, 13, fg);
+  else if (WiFi.RSSI() >= -60)
+    display.drawBitmap(x, y, wifiOn, 12, 12, fg);
+  else
+    display.drawBitmap(x, y, wifiAvg, 12, 12, fg);
+}
+
+int16_t topStatusWifiX(byte wifiState)
+{
+  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+  uint16_t timeWidth = u8g2Fonts.getUTF8Width("00:00");
+  int16_t wifiWidth = (wifiState == TOP_STATUS_WIFI_ERROR) ? TOP_STATUS_WIFI_ERROR_WIDTH : TOP_STATUS_WIFI_WIDTH;
+  return display.width() - TOP_STATUS_PADDING_X - timeWidth - TOP_STATUS_GAP - wifiWidth;
+}
+
+void drawTopStatusBar(float voltage, int percent, const char *timeText, bool invert, byte wifiState, const char *centerText)
+{
+  uint16_t bg = invert ? GxEPD_BLACK : GxEPD_WHITE;
+  uint16_t fg = invert ? GxEPD_WHITE : GxEPD_BLACK;
+  display.fillRect(0, 0, display.width(), TOP_STATUS_HEIGHT, bg);
+
+  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
+  u8g2Fonts.setForegroundColor(fg);
+  u8g2Fonts.setBackgroundColor(bg);
+
+  char voltageText[8];
+  char powerText[18];
+  dtostrf(voltage, 0, 2, voltageText);
+  if (voltage < 4)
+    snprintf(powerText, sizeof(powerText), "%sV %d%%", voltageText, percent);
+  else
+    snprintf(powerText, sizeof(powerText), "USB");
+
+  int16_t leftX = TOP_STATUS_PADDING_X;
+  iconBattery(display, percent, invert, leftX, TOP_STATUS_BATTERY_Y);
+  leftX += TOP_STATUS_BATTERY_WIDTH + TOP_STATUS_GAP;
+  u8g2Fonts.setCursor(leftX, TOP_STATUS_TEXT_Y);
+  u8g2Fonts.print(powerText);
+  leftX += u8g2Fonts.getUTF8Width(powerText);
+
+  uint16_t timeWidth = (timeText && timeText[0]) ? u8g2Fonts.getUTF8Width(timeText) : 0;
+  int16_t wifiWidth = (wifiState == TOP_STATUS_WIFI_ERROR) ? TOP_STATUS_WIFI_ERROR_WIDTH : TOP_STATUS_WIFI_WIDTH;
+  int16_t timeX = display.width() - TOP_STATUS_PADDING_X - timeWidth;
+  int16_t wifiX = timeX - TOP_STATUS_GAP - wifiWidth;
+
+  drawTopWifiIcon(wifiState, wifiX, TOP_STATUS_ICON_Y, invert);
+  if (timeWidth > 0)
+  {
+    u8g2Fonts.setCursor(timeX, TOP_STATUS_TEXT_Y);
+    u8g2Fonts.print(timeText);
+  }
+
+  if (centerText && centerText[0])
+  {
+    uint16_t centerWidth = u8g2Fonts.getUTF8Width(centerText);
+    int16_t centerX = (display.width() - centerWidth) / 2;
+    int16_t minCenterX = leftX + TOP_STATUS_GAP;
+    int16_t maxCenterX = wifiX - TOP_STATUS_GAP - centerWidth;
+    if (centerX < minCenterX)
+      centerX = minCenterX;
+    if (centerX <= maxCenterX)
+    {
+      u8g2Fonts.setCursor(centerX, TOP_STATUS_TEXT_Y);
+      u8g2Fonts.print(centerText);
+    }
+  }
 }
 
 /**
@@ -257,7 +345,8 @@ void turnOffWifi(bool extreme = false)
       Serial.println("Critical-battery power saver: WiFi off, CPU reduced");
     else
       Serial.println("WiFi off, CPU reduced after network activity");
-    Serial.println("CPU frequency MHz: " + String(getCpuFrequencyMhz()));
+    Serial.print("CPU frequency MHz: ");
+    Serial.println(getCpuFrequencyMhz());
   }
 }
 
@@ -292,7 +381,14 @@ bool autoTimeUpdate()
                           timeClient.getSeconds()));
 
       if (DEBUG_MODE)
-        Serial.println("RTC updated: " + String(year) + "-" + String(month) + "-" + String(day));
+      {
+        Serial.print("RTC updated: ");
+        Serial.print(year);
+        Serial.print("-");
+        Serial.print(month);
+        Serial.print("-");
+        Serial.println(day);
+      }
       return true;
     }
     else
@@ -313,14 +409,14 @@ void onlineTimePrint(bool invert = false);
  * @brief Displays network debugging information
  * @param msg Message to display in debug info
  */
-void networkInfo(String msg = "");
+void networkInfo(const String &msg = "");
 
 /**
  * @brief Prints a compact alert line without replacing the full screen
  * @param msg Alert text to print
  * @param invert Clears the alert strip with the current screen background color
  */
-void printAlertLine(String msg, bool invert);
+void printAlertLine(const String &msg, bool invert);
 
 /**
  * @brief Fetches and displays weather data
@@ -556,11 +652,10 @@ void setup()
       delay(2);
       WiFi.mode(WIFI_STA);
       WiFi.begin(ssid.c_str(), password.c_str());
-      while (WiFi.waitForConnectResult() != WL_CONNECTED)
+      if (WiFi.waitForConnectResult() != WL_CONNECTED)
       {
         if (DEBUG_MODE)
           Serial.println("WiFi connection failed");
-        break;
       }
 
       if (WiFi.status() == WL_CONNECTED) // if wifi is connected
@@ -688,8 +783,7 @@ void setup()
         display.fillScreen(GxEPD_WHITE);
         if (DEBUG_MODE)
           Serial.println("Drawing offline time screen");
-        display.drawBitmap(333, 0, wifiOff, 12, 12, GxEPD_BLACK); // wifi off icon
-        offlineTimePrint();                                       // offset for wifi off which shifts the temperature display to the middle
+        offlineTimePrint();
         if (DEBUG_MODE)
           Serial.println("Offline time screen drawn");
         if (BATTERY_CRITICAL)
@@ -709,7 +803,9 @@ void setup()
   if (DEBUG_MODE)
   {
     Serial.println("Preferences closed; I2C stopped");
-    Serial.println("Configured sleep interval: " + String(TIME_TO_SLEEP / 60) + " min");
+    Serial.print("Configured sleep interval: ");
+    Serial.print(TIME_TO_SLEEP / 60);
+    Serial.println(" min");
     Serial.flush(); // Flush the serial buffer
     delay(5);
   }
@@ -765,6 +861,7 @@ String weatherDataAPI(const char *serverName)
 
   // Your Domain name with URL path or IP address with path
   http.begin(client, serverName);
+  http.setTimeout(8000);
 
   // Send HTTP POST request
   httpResponseCode = http.GET();
@@ -801,15 +898,16 @@ String weatherDataAPI(const char *serverName)
  */
 bool checkHttpResponse(const char *source)
 {
-  if (httpResponseCode == -1 || httpResponseCode == -11)
-  {
-    ESP.restart();
-    return false;
-  }
-  else if (httpResponseCode != 200)
+  if (httpResponseCode != 200)
   {
     if (DEBUG_MODE)
-      Serial.println(String(source) + " API request failed with code: " + String(httpResponseCode));
+    {
+      Serial.print(source);
+      Serial.print(" API request failed with code: ");
+      Serial.println(httpResponseCode);
+    }
+    if (httpResponseCode == -1 || httpResponseCode == -11)
+      addSystemAlert("WEATHER API ERROR");
     networkInfo(source);
     return false;
   }
@@ -862,22 +960,7 @@ void onlineTimePrint(bool invert)
   u8g2Fonts.setForegroundColor(fg);
   u8g2Fonts.setBackgroundColor(bg);
 
-  //=============== 3. HEADER: BATTERY AND UPDATE TIME ===============
-  u8g2Fonts.setFont(u8g2_font_luRS08_tf);
-  u8g2Fonts.setCursor(28, 11);
-  u8g2Fonts.print(battLevel, 2);
-  u8g2Fonts.print("V");
-
-  u8g2Fonts.setCursor(63, 11);
-  u8g2Fonts.print(percent);
-  u8g2Fonts.print("%");
-  if (invert)
-  {
-    u8g2Fonts.setCursor(123, 11);
-    u8g2Fonts.print(" GHOSTING PROTECTION");
-  }
-  iconBattery(display, percent, invert);
-
+  //=============== 3. HEADER: POWER, WIFI, UPDATE TIME ===============
   byte currentHour = 0;
   byte currentMinute = 0;
   byte currentDay = 0;
@@ -894,11 +977,11 @@ void onlineTimePrint(bool invert)
     currentDayOfWeek = now.dayOfTheWeek();
   }
 
-  char timeStr[6];
-  snprintf(timeStr, sizeof(timeStr), "%02d:%02d", currentHour, currentMinute);
+  char timeStr[6] = "--:--";
+  if (RTC_READY)
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d", currentHour, currentMinute);
 
-  u8g2Fonts.setCursor(295, 11);
-  u8g2Fonts.print(timeStr);
+  drawTopStatusBar(battLevel, percent, timeStr, invert, TOP_STATUS_WIFI_CONNECTED, invert ? "GHOSTING PROTECTION" : "");
 
   //=============== 4. MAIN PANEL: DATE AND INDOOR TEMP ===============
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
@@ -1008,6 +1091,9 @@ void offlineTimePrint()
   int percent = constrain(((battLevel - battLow) / (battHigh - battLow)) * 100, 0, 100);
   BATTERY_CRITICAL = percent < critBattPercent;
 
+  // Start BME680 sampling early so display drawing hides part of the wait.
+  bool bmeStarted = BME680_READY && bme.beginReading();
+
   // Configure fonts and colors once at the start
   uint16_t bg = GxEPD_WHITE;
   uint16_t fg = GxEPD_BLACK;
@@ -1017,44 +1103,6 @@ void offlineTimePrint()
   u8g2Fonts.setFontDirection(0);
   u8g2Fonts.setForegroundColor(fg);
   u8g2Fonts.setBackgroundColor(bg);
-
-  // Battery voltage display section
-  if (true)
-  {
-    u8g2Fonts.setFont(u8g2_font_luRS08_tf);
-    u8g2Fonts.setCursor(2, 11);
-    u8g2Fonts.print(battLevel, 2);
-    u8g2Fonts.print("V");
-  }
-
-  u8g2Fonts.setCursor(165, 11);
-  u8g2Fonts.print("OFFLINE MODE");
-  u8g2Fonts.setCursor(367, 11);
-  if (battLevel < 4)
-  {
-    u8g2Fonts.print(percent);
-    u8g2Fonts.print("%");
-  }
-  else
-  {
-    u8g2Fonts.setCursor(370, 11);
-    u8g2Fonts.print("USB");
-  }
-
-  iconBattery(display, percent);
-
-  // Main temperature display
-  u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
-  u8g2Fonts.setCursor(100, 110);
-  if (tempReady)
-    u8g2Fonts.print(tempC);
-  else
-    u8g2Fonts.print("--");
-  u8g2Fonts.setCursor(280, 110);
-  u8g2Fonts.print("C");
-  u8g2Fonts.setFont(u8g2_font_inb19_mf);
-  u8g2Fonts.setCursor(270, 60);
-  u8g2Fonts.print("o");
 
   byte currentHour = 0;
   byte currentMinute = 0;
@@ -1073,6 +1121,25 @@ void offlineTimePrint()
     currentYear = now.year();
     currentDayOfWeek = now.dayOfTheWeek();
   }
+
+  char timeStr[6] = "--:--";
+  if (RTC_READY)
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d", currentHour, currentMinute);
+
+  drawTopStatusBar(battLevel, percent, timeStr, false, TOP_STATUS_WIFI_OFF, "OFFLINE MODE");
+
+  // Main temperature display
+  u8g2Fonts.setFont(u8g2_font_logisoso58_tf);
+  u8g2Fonts.setCursor(100, 110);
+  if (tempReady)
+    u8g2Fonts.print(tempC);
+  else
+    u8g2Fonts.print("--");
+  u8g2Fonts.setCursor(280, 110);
+  u8g2Fonts.print("C");
+  u8g2Fonts.setFont(u8g2_font_inb19_mf);
+  u8g2Fonts.setCursor(270, 60);
+  u8g2Fonts.print("o");
 
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(10, 150);
@@ -1107,7 +1174,7 @@ void offlineTimePrint()
     display.fillRect(397, 160, 3, 100, lineColor); // vertical line last
   }
   // Environmental readings
-  bool bmeReady = BME680_READY && bme.beginReading() && bme.endReading();
+  bool bmeReady = bmeStarted && bme.endReading();
   if (BME680_READY && !bmeReady)
   {
     if (DEBUG_MODE)
@@ -1165,8 +1232,6 @@ void offlineTimePrint()
   u8g2Fonts.print("hPa");
 
   // Last update time
-  char timeStr[6];
-  snprintf(timeStr, sizeof(timeStr), "%02d:%02d", currentHour, currentMinute);
   u8g2Fonts.setFont(u8g2_font_8x13_tf);
   u8g2Fonts.setCursor(306, 190);
   u8g2Fonts.print("Last Update");
@@ -1258,8 +1323,12 @@ void weatherPrint(bool invert)
   if (error)
   {
     if (DEBUG_MODE)
-      Serial.println("OpenWeather JSON parse failed: " + String(error.c_str()));
-    ESP.restart();
+    {
+      Serial.print("OpenWeather JSON parse failed: ");
+      Serial.println(error.c_str());
+    }
+    addSystemAlert("WEATHER JSON ERROR");
+    networkInfo("OpenWeather JSON");
     return;
   }
 
@@ -1286,8 +1355,12 @@ void weatherPrint(bool invert)
   if (error)
   {
     if (DEBUG_MODE)
-      Serial.println("Custom weather JSON parse failed: " + String(error.c_str()));
-    ESP.restart();
+    {
+      Serial.print("Custom weather JSON parse failed: ");
+      Serial.println(error.c_str());
+    }
+    addSystemAlert("WEATHER JSON ERROR");
+    networkInfo("Custom JSON");
     return;
   }
 
@@ -1297,7 +1370,6 @@ void weatherPrint(bool invert)
     return;
   }
 
-  wifiStatus(invert);
   u8g2Fonts.setFontMode(1);
   u8g2Fonts.setFontDirection(0);
   u8g2Fonts.setForegroundColor(fg);
@@ -1309,11 +1381,17 @@ void weatherPrint(bool invert)
 
   float outdoorTemp = customObject["data"]["temp"].as<float>();
   float feelsLike = myObject["current"]["feels_like"].as<float>();
+  char outdoorTempText[12];
+  char feelsLikeValue[12];
+  char feelsLikeText[24];
+  dtostrf(outdoorTemp, 0, 2, outdoorTempText);
+  dtostrf(feelsLike, 0, 2, feelsLikeValue);
+  snprintf(feelsLikeText, sizeof(feelsLikeText), "Real Feel:%s", feelsLikeValue);
 
   u8g2Fonts.setFont(u8g2_font_fub20_tf);
-  uint16_t width = u8g2Fonts.getUTF8Width(String(outdoorTemp).c_str());
+  uint16_t width = u8g2Fonts.getUTF8Width(outdoorTempText);
   u8g2Fonts.setCursor(20, 200);
-  u8g2Fonts.print(outdoorTemp);
+  u8g2Fonts.print(outdoorTempText);
   u8g2Fonts.setCursor(30 + width, 200);
   u8g2Fonts.print("C");
   u8g2Fonts.setFont(u8g2_font_fub11_tf);
@@ -1321,12 +1399,11 @@ void weatherPrint(bool invert)
   u8g2Fonts.print("o");
 
   u8g2Fonts.setFont(u8g2_font_fur11_tf);
-  String feelsLikeText = "Real Feel:" + String(feelsLike);
-  width = u8g2Fonts.getUTF8Width(feelsLikeText.c_str());
+  width = u8g2Fonts.getUTF8Width(feelsLikeText);
   u8g2Fonts.setCursor(5, 220);
   u8g2Fonts.print("Real Feel:");
   u8g2Fonts.setCursor(75, 220);
-  u8g2Fonts.print(feelsLike);
+  u8g2Fonts.print(feelsLikeValue);
   u8g2Fonts.setCursor(width + 16, 220);
   u8g2Fonts.print("C");
   u8g2Fonts.setFont(u8g2_font_baby_tf);
@@ -1405,9 +1482,12 @@ void weatherPrint(bool invert)
  * @brief Displays network debugging information
  * @note Shows WiFi status, signal strength, and HTTP response codes
  */
-void networkInfo(String msg)
+void networkInfo(const String &msg)
 {
-  display.drawBitmap(270, 0, wifiError, 13, 13, GxEPD_BLACK);
+  bool connected = WiFi.status() == WL_CONNECTED;
+  int rssi = WiFi.RSSI();
+
+  drawTopWifiIcon(TOP_STATUS_WIFI_ERROR, topStatusWifiX(TOP_STATUS_WIFI_ERROR), TOP_STATUS_ICON_Y, false);
   display.drawBitmap(100, 160, net, 29, 28, GxEPD_BLACK);
   u8g2Fonts.setFont(u8g2_font_logisoso20_tf);
   u8g2Fonts.setCursor(145, 184); // start writing at this position
@@ -1416,25 +1496,35 @@ void networkInfo(String msg)
   u8g2Fonts.setFont(u8g2_font_logisoso16_tf);
   u8g2Fonts.setCursor(5, 220); // start writing at this position
   u8g2Fonts.print("Connected: ");
-  if (WiFi.status() == WL_CONNECTED)
-    u8g2Fonts.print("Yes (" + String(WiFi.SSID()) + ")");
+  if (connected)
+  {
+    u8g2Fonts.print("Yes (");
+    u8g2Fonts.print(WiFi.SSID());
+    u8g2Fonts.print(")");
+  }
   else
     u8g2Fonts.print("No");
-  u8g2Fonts.setCursor(5, 245); // start writing at this position
-  u8g2Fonts.print("HTTP Code: " + String(httpResponseCode));
-  u8g2Fonts.setCursor(5, 270); // start writing at this position
-  u8g2Fonts.print("WiFi RSSI: " + String(WiFi.RSSI()));
 
-  if (WiFi.RSSI() > -50)
+  u8g2Fonts.setCursor(5, 245); // start writing at this position
+  u8g2Fonts.print("HTTP Code: ");
+  u8g2Fonts.print(httpResponseCode);
+
+  u8g2Fonts.setCursor(5, 270); // start writing at this position
+  u8g2Fonts.print("WiFi RSSI: ");
+  u8g2Fonts.print(rssi);
+
+  if (rssi > -50)
     u8g2Fonts.print(" Excellent");
-  else if (WiFi.RSSI() > -60)
+  else if (rssi > -60)
     u8g2Fonts.print(" Good");
-  else if (WiFi.RSSI() > -70)
+  else if (rssi > -70)
     u8g2Fonts.print(" Fair");
   else
     u8g2Fonts.print(" Poor");
+
   u8g2Fonts.setCursor(5, 295); // start writing at this position
-  u8g2Fonts.print("Comments: " + msg);
+  u8g2Fonts.print("Comments: ");
+  u8g2Fonts.print(msg);
 }
 
 /**
@@ -1443,10 +1533,7 @@ void networkInfo(String msg)
  */
 void wifiStatus(bool invert)
 {
-  if (WiFi.RSSI() >= -60)
-    display.drawBitmap(270, 0, wifiOn, 12, 12, invert ? GxEPD_WHITE : GxEPD_BLACK);
-  else
-    display.drawBitmap(270, 0, wifiAvg, 12, 12, invert ? GxEPD_WHITE : GxEPD_BLACK);
+  drawTopWifiIcon(TOP_STATUS_WIFI_CONNECTED, topStatusWifiX(TOP_STATUS_WIFI_CONNECTED), TOP_STATUS_ICON_Y, invert);
 }
 
 /**

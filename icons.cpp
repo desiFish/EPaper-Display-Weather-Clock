@@ -37,28 +37,27 @@ uint16_t invertColor(uint16_t color, bool invert)
 }
 
 // takes battery percent (integer) as input and prints battery icon
-void iconBattery(GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> &display, byte percent, bool invert)
+void iconBattery(GxEPD2_3C<GxEPD2_420c_Z21, GxEPD2_420c_Z21::HEIGHT> &display, byte percent, bool invert, int16_t x, int16_t y)
 {
-    int xOffset = 345;
-    display.drawRect(8 + xOffset, 4, 12, 7, invertColor(GxEPD_BLACK, invert));
-    display.drawRect(6 + xOffset, 5, 2, 5, invertColor(GxEPD_BLACK, invert));
+    display.drawRect(x + 2, y, 12, 7, invertColor(GxEPD_BLACK, invert));
+    display.drawRect(x, y + 1, 2, 5, invertColor(GxEPD_BLACK, invert));
 
     if (percent >= 95) // Full
-        display.fillRect(9 + xOffset, 4, 10, 6, invertColor(GxEPD_BLACK, invert));
+        display.fillRect(x + 3, y, 10, 6, invertColor(GxEPD_BLACK, invert));
     else if (percent >= 85 && percent < 95) // ful-Med
-        display.fillRect(10 + xOffset, 4, 9, 6, invertColor(GxEPD_BLACK, invert));
+        display.fillRect(x + 4, y, 9, 6, invertColor(GxEPD_BLACK, invert));
     else if (percent > 65 && percent < 85) // Med
-        display.fillRect(11 + xOffset, 4, 9, 6, invertColor(GxEPD_BLACK, invert));
+        display.fillRect(x + 5, y, 9, 6, invertColor(GxEPD_BLACK, invert));
     else if (percent > 40 && percent <= 65) // half
-        display.fillRect(13 + xOffset, 4, 7, 6, invertColor(GxEPD_BLACK, invert));
+        display.fillRect(x + 7, y, 7, 6, invertColor(GxEPD_BLACK, invert));
     else if (percent > 20 && percent <= 40) // low
-        display.fillRect(15 + xOffset, 4, 5, 6, invertColor(GxEPD_BLACK, invert));
+        display.fillRect(x + 9, y, 5, 6, invertColor(GxEPD_BLACK, invert));
     else if (percent > 8 && percent <= 20) // critical-low
-        display.fillRect(16 + xOffset, 5, 3, 5, invertColor(GxEPD_RED, invert));
+        display.fillRect(x + 10, y + 1, 3, 5, invertColor(GxEPD_RED, invert));
     else
     { // near empty
-        display.drawRect(8 + xOffset, 4, 12, 7, invertColor(GxEPD_RED, invert));
-        display.drawRect(6 + xOffset, 5, 2, 5, invertColor(GxEPD_RED, invert));
+        display.drawRect(x + 2, y, 12, 7, invertColor(GxEPD_RED, invert));
+        display.drawRect(x, y + 1, 2, 5, invertColor(GxEPD_RED, invert));
     }
 }
 
