@@ -205,7 +205,7 @@ Sleep Current Draw: 20µA → 35nA<br>
   <tr>
     <td>Third Cycle</td>
     <td>TBD</td>
-    <td>TBD - TBD</td>
+    <td>13/08/2026 - TBD</td>
   </tr>
 </table>
 
