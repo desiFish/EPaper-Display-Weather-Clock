@@ -1353,7 +1353,7 @@ void weatherPrint(bool invert)
     return;
   }
 
-  if (myObject["current"]["temp"].isNull() || customObject["data"]["temp"].isNull())
+  if (myObject["current"]["temp"].isNull() || customObject["data"]["temp"].isNull() || customObject["data"]["temp2"].isNull())
   {
     networkInfo();
     return;
@@ -1368,7 +1368,7 @@ void weatherPrint(bool invert)
   u8g2Fonts.setCursor(29, 170);
   u8g2Fonts.print("OUTDOOR");
 
-  float outdoorTemp = customObject["data"]["temp"].as<float>();
+  float outdoorTemp = (customObject["data"]["temp"].as<float>() + customObject["data"]["temp2"].as<float>()) / 2.0f;
   float feelsLike = myObject["current"]["feels_like"].as<float>();
   char outdoorTempText[12];
   char feelsLikeValue[12];
